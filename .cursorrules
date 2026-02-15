@@ -1,0 +1,97 @@
+# Unit Rate Calculation App — Cursor Rules
+
+## Project Overview
+Construction cost estimation app using Resource Explosion methodology.
+Full spec: SPEC.md (READ IT FIRST — it contains all logic, schema, and test data)
+
+## Tech Stack
+- Next.js 14+ with App Router (TypeScript)
+- Prisma ORM + SQLite (MVP) → PostgreSQL later
+- Tailwind CSS + shadcn/ui components
+- React Hook Form + Zod validation
+
+## CRITICAL RULES — READ THESE FIRST
+
+### Rule #1: Equipment Direct Cost (EDC) — THE GOLDEN RULE
+Equipment Direct Cost = Operator Labor Cost + Fuel/Material Cost
+- EDC is NOT a separate cost line in totals
+- It's ALREADY included in Labor + Material totals via resource explosion
+- Only Equipment Depreciation (EDP) is added separately
+- Total Cost = Labor Cost + Material Cost + Depreciation
+- NEVER: Total = Labor + Material + Equipment Direct Cost + Depreciation ❌
+- ALWAYS: Total = Labor + Material + Depreciation ✅
+
+### Rule #2: Base Quantity Multiplier
+Analysis items have a "base quantity" (e.g., "per 1000 m³" or "per 10000 m³").
+When calculating unit rates, ALWAYS divide by base quantity:
+- Unit Rate = Total Resource Cost / Base Quantity
+- When applying to BoQ: multiply coefficient × unit rate × BoQ quantity
+
+### Rule #3: Resource Explosion Must Be Recursive
+BoQ → Analysis (coefficient) → Resources → Equipment → Sub-resources (labor + material)
+Always trace equipment back to its labor and fuel components.
+
+### Rule #4: Aggregation
+When showing Resource Summary, aggregate ALL the same resource across ALL BoQ items.
+e.g., "Skilled Labor" from direct analysis use + indirect equipment operator use = one total.
+
+## Build Order (follow strictly)
+1. Phase 1: Project setup, Prisma schema, seed data, Labor/Material/Equipment CRUD
+2. Phase 2: Equipment resource breakdown (sub-resources per equipment)
+3. Phase 3: Analysis builder (add resources to analysis, real-time cost calc)
+4. Phase 4: BoQ manager (link analysis items with coefficients)
+5. Phase 5: Resource explosion engine + summary report
+6. Phase 6: Validation against test data, polish UI
+
+## File Structure
+```
+src/
+  app/
+    page.tsx                    # Dashboard
+    layout.tsx                  # Root layout with sidebar nav
+    labor/page.tsx              # Labor CRUD
+    materials/page.tsx          # Material CRUD
+    equipment/page.tsx          # Equipment list
+    equipment/[id]/page.tsx     # Equipment detail + resource breakdown
+    analysis/page.tsx           # Analysis list
+    analysis/[id]/page.tsx      # Analysis builder
+    boq/page.tsx                # BoQ list
+    boq/[id]/page.tsx           # BoQ detail + analysis links
+    reports/page.tsx            # Resource explosion summary
+    api/
+      labor/route.ts
+      materials/route.ts
+      equipment/route.ts
+      analysis/route.ts
+      boq/route.ts
+      reports/explosion/route.ts
+  lib/
+    db.ts                       # Prisma client
+    calculations.ts             # Resource explosion engine
+    utils.ts                    # Helpers
+prisma/
+  schema.prisma
+  seed.ts                       # Test data from SPEC.md Section 8
+```
+
+## UI Guidelines
+- Dark professional theme (construction industry feel)
+- Large, readable fonts (users may be senior engineers)
+- Tables with clear number formatting (2 decimal places for rates, 0 for quantities)
+- Real-time calculation previews wherever possible
+- Confirmation dialogs before any delete operation
+- Toast notifications for save/update/delete actions
+
+## Validation Test Data
+After building, these numbers MUST match:
+- Bulldozer EDC: 192.00/hr (NOT 217 — that's ETC which includes depreciation)
+- Roller EDC: 101.00/hr
+- Analysis 7001 ATC: 2.186/cum
+- Analysis 7002 ATC: 3.22/cum
+- BoQ 9001 Grand Total: 2,713,000
+- Total Diesel: 400,000 lt
+- Total Skilled Labor: 16,000 hrs
+- Total Depreciation: 225,000
+
+## When In Doubt
+Refer to SPEC.md — it has the complete schema, algorithm, API routes, and expected outputs.
