@@ -3,6 +3,12 @@ import { PrismaClient, Prisma } from "@prisma/client";
 export { getPrismaForProject } from "./projects";
 import { Decimal } from "@prisma/client/runtime/library";
 import { computeEquipmentCosts, computeAnalysisCosts, computeBoqCosts } from "./calculations";
+import {
+  getCurrencyMultipliers,
+  applyConversionToSubResources,
+  applyConversionToAnalysisResources,
+  applyConversionToBoqAnalyses,
+} from "./currency";
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
@@ -97,14 +103,21 @@ export async function getEquipmentList(
     );
   }
 
+  const multipliers = await getCurrencyMultipliers(prisma, projectId);
+
   return equipment.map((eq) => {
+    const subResources = applyConversionToSubResources(
+      eq.subResources as Array<{ labor?: { rate: unknown; currencySlot?: number } | null; material?: { rate: unknown; currencySlot?: number } | null }>,
+      multipliers
+    ) as typeof eq.subResources;
     const costs = computeEquipmentCosts(
       eq.totalValue,
       eq.depreciationTotal,
-      eq.subResources
+      subResources
     );
     return {
       ...eq,
+      subResources,
       costs,
     };
   });
@@ -134,14 +147,20 @@ export async function getEquipmentById(
     return null;
   }
 
+  const multipliers = await getCurrencyMultipliers(prisma, projectId);
+  const subResources = applyConversionToSubResources(
+    equipment.subResources as Array<{ labor?: { rate: unknown; currencySlot?: number } | null; material?: { rate: unknown; currencySlot?: number } | null }>,
+    multipliers
+  ) as typeof equipment.subResources;
   const costs = computeEquipmentCosts(
     equipment.totalValue,
     equipment.depreciationTotal,
-    equipment.subResources
+    subResources
   );
 
   return {
     ...equipment,
+    subResources,
     costs,
   };
 }
@@ -453,10 +472,14 @@ export async function getAnalyses(
     );
   }
 
+  const multipliers = await getCurrencyMultipliers(prisma, projectId);
+
   return analyses.map((a) => {
-    const costs = computeAnalysisCosts(a.baseQuantity, a.resources);
+    const resources = applyConversionToAnalysisResources(a.resources as Parameters<typeof applyConversionToAnalysisResources>[0], multipliers) as typeof a.resources;
+    const costs = computeAnalysisCosts(a.baseQuantity, resources);
     return {
       ...a,
+      resources,
       costs,
     };
   });
@@ -496,10 +519,13 @@ export async function getAnalysisById(
     return null;
   }
 
-  const costs = computeAnalysisCosts(analysis.baseQuantity, analysis.resources);
+  const multipliers = await getCurrencyMultipliers(prisma, projectId);
+  const resources = applyConversionToAnalysisResources(analysis.resources as Parameters<typeof applyConversionToAnalysisResources>[0], multipliers) as typeof analysis.resources;
+  const costs = computeAnalysisCosts(analysis.baseQuantity, resources);
 
   return {
     ...analysis,
+    resources,
     costs,
   };
 }
@@ -581,10 +607,13 @@ export async function createAnalysis(
     },
   });
 
-  const costs = computeAnalysisCosts(analysis.baseQuantity, analysis.resources);
+  const multipliers = await getCurrencyMultipliers(prisma, projectId);
+  const resources = applyConversionToAnalysisResources(analysis.resources as Parameters<typeof applyConversionToAnalysisResources>[0], multipliers) as typeof analysis.resources;
+  const costs = computeAnalysisCosts(analysis.baseQuantity, resources);
 
   return {
     ...analysis,
+    resources,
     costs,
   };
 }
@@ -693,10 +722,13 @@ export async function updateAnalysis(
     },
   });
 
-  const costs = computeAnalysisCosts(analysis.baseQuantity, analysis.resources);
+  const multipliers = await getCurrencyMultipliers(prisma, projectId);
+  const resources = applyConversionToAnalysisResources(analysis.resources as Parameters<typeof applyConversionToAnalysisResources>[0], multipliers) as typeof analysis.resources;
+  const costs = computeAnalysisCosts(analysis.baseQuantity, resources);
 
   return {
     ...analysis,
+    resources,
     costs,
   };
 }
@@ -809,10 +841,14 @@ export async function getBoqItems(
     );
   }
 
+  const multipliers = await getCurrencyMultipliers(prisma, projectId);
+
   return items.map((item) => {
-    const costs = computeBoqCosts(item.quantity, item.boqAnalyses);
+    const boqAnalyses = applyConversionToBoqAnalyses(item.boqAnalyses as Parameters<typeof applyConversionToBoqAnalyses>[0], multipliers) as typeof item.boqAnalyses;
+    const costs = computeBoqCosts(item.quantity, boqAnalyses);
     return {
       ...item,
+      boqAnalyses,
       costs,
     };
   });
@@ -835,9 +871,12 @@ export async function getBoqItemById(
     return null;
   }
 
-  const costs = computeBoqCosts(item.quantity, item.boqAnalyses);
+  const multipliers = await getCurrencyMultipliers(prisma, projectId);
+  const boqAnalyses = applyConversionToBoqAnalyses(item.boqAnalyses as Parameters<typeof applyConversionToBoqAnalyses>[0], multipliers) as typeof item.boqAnalyses;
+  const costs = computeBoqCosts(item.quantity, boqAnalyses);
   return {
     ...item,
+    boqAnalyses,
     costs,
   };
 }
@@ -879,9 +918,12 @@ export async function createBoqItem(
     include: boqAnalysisInclude,
   });
 
-  const costs = computeBoqCosts(item.quantity, item.boqAnalyses);
+  const multipliers = await getCurrencyMultipliers(prisma, projectId);
+  const boqAnalyses = applyConversionToBoqAnalyses(item.boqAnalyses as Parameters<typeof applyConversionToBoqAnalyses>[0], multipliers) as typeof item.boqAnalyses;
+  const costs = computeBoqCosts(item.quantity, boqAnalyses);
   return {
     ...item,
+    boqAnalyses,
     costs,
   };
 }
@@ -938,9 +980,12 @@ export async function updateBoqItem(
     include: boqAnalysisInclude,
   });
 
-  const costs = computeBoqCosts(item.quantity, item.boqAnalyses);
+  const multipliers = await getCurrencyMultipliers(prisma, projectId);
+  const boqAnalyses = applyConversionToBoqAnalyses(item.boqAnalyses as Parameters<typeof applyConversionToBoqAnalyses>[0], multipliers) as typeof item.boqAnalyses;
+  const costs = computeBoqCosts(item.quantity, boqAnalyses);
   return {
     ...item,
+    boqAnalyses,
     costs,
   };
 }

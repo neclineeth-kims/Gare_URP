@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPrismaForProject } from "@/lib/projects";
+import { getMainCurrencyDisplay } from "@/lib/currency";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
@@ -21,10 +22,14 @@ export default async function ProjectLayout({
   }
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    include: { currency: true },
   });
 
   if (!project) notFound();
+
+  const mainCurrency = await getMainCurrencyDisplay(prisma, projectId);
+  const currencyDisplay = mainCurrency
+    ? `${mainCurrency.symbol} ${mainCurrency.code}`
+    : "US$";
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -36,9 +41,7 @@ export default async function ProjectLayout({
         </Link>
         <div className="flex-1">
           <h1 className="font-semibold">{project.name}</h1>
-          <p className="text-xs text-muted-foreground">
-            {project.currency.symbol} {project.currency.code}
-          </p>
+          <p className="text-xs text-muted-foreground">{currencyDisplay}</p>
         </div>
       </header>
 

@@ -25,21 +25,37 @@ model Currency {
 }
 
 model Project {
-  id          String      @id @default(uuid())
-  name        String
-  description String?
-  currencyId  String      @map("currency_id")
-  currency    Currency    @relation(fields: [currencyId], references: [id])
-  status      String      @default("active")
-  labor       Labor[]
-  materials   Material[]
-  equipment   Equipment[]
-  analysis    Analysis[]
-  boqItems    BoqItem[]
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
+  id              String            @id @default(uuid())
+  name            String
+  description     String?
+  currencyId      String            @map("currency_id")
+  currency        Currency          @relation(fields: [currencyId], references: [id])
+  status          String            @default("active")
+  projectCurrencies ProjectCurrency[]
+  labor           Labor[]
+  materials       Material[]
+  equipment       Equipment[]
+  analysis        Analysis[]
+  boqItems        BoqItem[]
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
 
   @@map("projects")
+}
+
+model ProjectCurrency {
+  id         String   @id @default(uuid())
+  projectId  String   @map("project_id")
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slot       Int      // 1-5, slot 1 = main/local currency
+  code       String   // e.g. "SOM", "EUR", "USD"
+  name       String   // e.g. "Somoni", "Euro"
+  multiplier Decimal  @default(1) // exchange rate vs main. Slot 1 always = 1
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([projectId, slot])
+  @@map("project_currencies")
 }
 
 model Labor {
@@ -50,6 +66,7 @@ model Labor {
   name               String
   unit               String
   rate               Decimal
+  currencySlot       Int                 @default(1) @map("currency_slot") // 1-5, references ProjectCurrency.slot
   equipmentResources EquipmentResource[]
   analysisResources  AnalysisResource[]
   createdAt          DateTime            @default(now()) @map("created_at")
@@ -67,6 +84,7 @@ model Material {
   name               String
   unit               String
   rate               Decimal
+  currencySlot       Int                 @default(1) @map("currency_slot") // 1-5, references ProjectCurrency.slot
   equipmentResources EquipmentResource[]
   analysisResources  AnalysisResource[]
   createdAt          DateTime            @default(now()) @map("created_at")

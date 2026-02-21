@@ -7,16 +7,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Plus, Search, FolderOpen, HardHat } from "lucide-react";
+import { Plus, Search, FolderOpen, HardHat, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 type ProjectEntry = {
@@ -29,9 +33,10 @@ type ProjectEntry = {
 export function LandingPageClient({ projects }: { projects: ProjectEntry[] }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const [newName, setNewName] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const filtered = search.trim()
     ? projects.filter(
@@ -41,34 +46,54 @@ export function LandingPageClient({ projects }: { projects: ProjectEntry[] }) {
       )
     : projects;
 
-  async function handleCreateProject(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newName.trim()) {
-      toast.error("Please enter a project name");
-      return;
-    }
-    setIsCreating(true);
+  const handleEditOpen = (project: ProjectEntry) => {
+    setEditId(project.id);
+    setEditName(project.name);
+  };
+
+  const handleEditSave = async () => {
+    if (!editId || !editName.trim()) return;
+    setLoading(true);
     try {
-      const res = await fetch("/api/projects", {
-        method: "POST",
+      const res = await fetch(`/api/projects/${editId}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName.trim() }),
+        body: JSON.stringify({ name: editName.trim() }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error || "Failed to create project");
-        return;
+      const json = await res.json();
+      if (res.ok) {
+        toast.success("Project renamed");
+        setEditId(null);
+        router.refresh();
+      } else {
+        toast.error(json.error || "Failed to rename");
       }
-      toast.success(`Project "${data.data.name}" created`);
-      setDialogOpen(false);
-      setNewName("");
-      router.push(`/projects/${data.data.id}`);
     } catch {
-      toast.error("Failed to create project");
+      toast.error("Failed to rename project");
     } finally {
-      setIsCreating(false);
+      setLoading(false);
     }
-  }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteId) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${deleteId}`, { method: "DELETE" });
+      const json = await res.json();
+      if (res.ok) {
+        toast.success("Project deleted");
+        setDeleteId(null);
+        router.refresh();
+      } else {
+        toast.error(json.error || "Failed to delete");
+      }
+    } catch {
+      toast.error("Failed to delete project");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen">
@@ -83,50 +108,12 @@ export function LandingPageClient({ projects }: { projects: ProjectEntry[] }) {
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-2xl font-bold">Projects</h2>
           <div className="flex gap-2">
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4" />
-                  Start new project
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <form onSubmit={handleCreateProject}>
-                  <DialogHeader>
-                    <DialogTitle>Create new project</DialogTitle>
-                    <DialogDescription>
-                      Enter a name for your project. A new directory will be created with empty databases.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="project-name">Project name</Label>
-                      <Input
-                        id="project-name"
-                        value={newName}
-                        onChange={(e) => setNewName(e.target.value)}
-                        placeholder="e.g. Highway Phase 1"
-                        disabled={isCreating}
-                        autoFocus
-                      />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setDialogOpen(false)}
-                      disabled={isCreating}
-                    >
-                      Cancel
-                    </Button>
-                    <Button type="submit" disabled={isCreating}>
-                      {isCreating ? "Creating…" : "Create"}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <Button asChild>
+              <Link href="/new-project">
+                <Plus className="h-4 w-4" />
+                Start new project
+              </Link>
+            </Button>
           </div>
         </div>
 
@@ -163,28 +150,101 @@ export function LandingPageClient({ projects }: { projects: ProjectEntry[] }) {
             </CardHeader>
           </Card>
         ) : (
+          <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((project) => (
-              <Link key={project.id} href={`/projects/${project.id}`}>
-                <Card className="h-full transition-colors hover:bg-accent/50">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center gap-2">
-                      <FolderOpen className="h-5 w-5 text-muted-foreground" />
-                      <CardTitle className="text-lg">{project.name}</CardTitle>
-                    </div>
-                    <CardDescription>
-                      Created {new Date(project.createdAt).toLocaleDateString()}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <span className="text-sm text-muted-foreground">
-                      Open project →
-                    </span>
-                  </CardContent>
-                </Card>
-              </Link>
+              <Card key={project.id} className="h-full transition-colors hover:bg-accent/50">
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <Link href={`/projects/${project.id}`} className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <FolderOpen className="h-5 w-5 shrink-0 text-muted-foreground" />
+                        <CardTitle className="text-lg truncate">{project.name}</CardTitle>
+                      </div>
+                    </Link>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleEditOpen(project)}>
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setDeleteId(project.id)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <CardDescription>
+                    Created {new Date(project.createdAt).toLocaleDateString()}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Link href={`/projects/${project.id}`}>
+                    <span className="text-sm text-muted-foreground">Open project →</span>
+                  </Link>
+                </CardContent>
+              </Card>
             ))}
           </div>
+
+          <Dialog open={!!editId} onOpenChange={(open) => !open && setEditId(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Rename project</DialogTitle>
+                <DialogDescription>
+                  Enter a new name for this project.
+                </DialogDescription>
+              </DialogHeader>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Project name"
+                onKeyDown={(e) => e.key === "Enter" && handleEditSave()}
+              />
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditId(null)} disabled={loading}>
+                  Cancel
+                </Button>
+                <Button onClick={handleEditSave} disabled={loading || !editName.trim()}>
+                  {loading ? "Saving…" : "Save"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete project</DialogTitle>
+                <DialogDescription>
+                  This will permanently delete the project folder and all its data. This action
+                  cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDeleteId(null)} disabled={loading}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleDeleteConfirm}
+                  disabled={loading}
+                >
+                  {loading ? "Deleting…" : "Delete"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          </>
         )}
       </main>
     </div>

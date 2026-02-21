@@ -4,7 +4,7 @@
  * unitrate_main is the template with empty schema + currencies.
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, rmSync } from "fs";
 import path from "path";
 import { PrismaClient } from "@prisma/client";
 
@@ -92,6 +92,49 @@ export function unregisterProject(projectId: string): boolean {
   if (entries.length === readRegistry().length) return false;
   writeRegistry(entries);
   return true;
+}
+
+/** Delete project: unregister and remove project folder from disk */
+export function deleteProject(projectId: string): void {
+  const entry = getProjectById(projectId);
+  if (!entry) {
+    throw new Error(`Project not found: ${projectId}`);
+  }
+  unregisterProject(projectId);
+  if (existsSync(entry.path)) {
+    rmSync(entry.path, { recursive: true });
+  }
+}
+
+/** Update project name in registry and in the project database */
+export async function updateProjectName(projectId: string, newName: string): Promise<void> {
+  const entry = getProjectById(projectId);
+  if (!entry) {
+    throw new Error(`Project not found: ${projectId}`);
+  }
+  const validation = validateProjectName(newName);
+  if (!validation.valid) {
+    throw new Error(validation.error);
+  }
+  const trimmed = newName.trim();
+  const lower = trimmed.toLowerCase();
+  const existing = readRegistry().find(
+    (p) => p.id !== projectId && p.name.toLowerCase() === lower
+  );
+  if (existing) {
+    throw new Error(`A project named "${trimmed}" already exists`);
+  }
+  const entries = readRegistry();
+  const idx = entries.findIndex((p) => p.id === projectId);
+  if (idx === -1) return;
+  entries[idx] = { ...entries[idx], name: trimmed };
+  writeRegistry(entries);
+  try {
+    const prisma = getPrismaForProject(projectId);
+    await prisma.project.update({ where: { id: projectId }, data: { name: trimmed } });
+  } catch {
+    // Registry updated; DB update optional (project may be broken)
+  }
 }
 
 /** Validate project name: no path traversal, no reserved chars */

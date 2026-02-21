@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getPrismaForProject } from "@/lib/projects";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Package, Wrench, BarChart3, ClipboardList } from "lucide-react";
+import { Coins, Users, Package, Wrench, BarChart3, ClipboardList } from "lucide-react";
 
 export default async function ProjectOverviewPage({
   params,
@@ -11,15 +11,18 @@ export default async function ProjectOverviewPage({
   const { projectId } = await params;
   const prisma = getPrismaForProject(projectId);
 
-  const [laborCount, materialsCount, equipmentCount, analysisCount, boqCount] = await Promise.all([
-    prisma.labor.count({ where: { projectId } }),
-    prisma.material.count({ where: { projectId } }),
-    prisma.equipment.count({ where: { projectId } }),
-    prisma.analysis.count({ where: { projectId } }),
-    prisma.boqItem.count({ where: { projectId } }),
-  ]);
+  const [currencyCount, laborCount, materialsCount, equipmentCount, analysisCount, boqCount] =
+    await Promise.all([
+      prisma.projectCurrency.count({ where: { projectId } }),
+      prisma.labor.count({ where: { projectId } }),
+      prisma.material.count({ where: { projectId } }),
+      prisma.equipment.count({ where: { projectId } }),
+      prisma.analysis.count({ where: { projectId } }),
+      prisma.boqItem.count({ where: { projectId } }),
+    ]);
 
   const stats = [
+    { label: "Currencies", count: currencyCount, href: "currencies", icon: Coins },
     { label: "Labor", count: laborCount, href: "labor", icon: Users },
     { label: "Materials", count: materialsCount, href: "materials", icon: Package },
     { label: "Equipment", count: equipmentCount, href: "equipment", icon: Wrench },

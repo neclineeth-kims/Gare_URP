@@ -37,18 +37,38 @@ type Labor = {
   name: string;
   unit: string;
   rate: string;
+  currencySlot: number;
 };
 
 type LaborApiItem = Omit<Labor, "rate"> & { rate: unknown };
+
+type Currency = { slot: number; code: string; name: string; multiplier: string };
 
 export default function LaborPage() {
   const params = useParams();
   const projectId = params.projectId as string;
   const [labor, setLabor] = useState<Labor[]>([]);
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ code: "", name: "", unit: "hr", rate: "" });
+  const [form, setForm] = useState({ code: "", name: "", unit: "hr", rate: "", currencySlot: 1 });
+
+  const fetchCurrencies = async () => {
+    const res = await fetch(`/api/v1/projects/${projectId}/currencies`);
+    const json = await res.json();
+    if (res.ok && json.data) {
+      setCurrencies(json.data.map((c: Currency) => ({ ...c, multiplier: String(c.multiplier ?? 1) })));
+    }
+  };
+
+  const mainCurrency = currencies.find((c) => c.slot === 1);
+  const mainMult = mainCurrency ? Number(mainCurrency.multiplier) || 1 : 1;
+  const getMultiplier = (slot: number) => {
+    const c = currencies.find((x) => x.slot === slot);
+    if (!c || mainMult <= 0) return 1;
+    return (Number(c.multiplier) || 1) / mainMult;
+  };
 
   const fetchLabor = async () => {
     const res = await fetch(`/api/v1/projects/${projectId}/labor`);
@@ -58,18 +78,19 @@ export default function LaborPage() {
         (json.data as LaborApiItem[]).map((l) => ({
           ...l,
           rate: l.rate != null ? String(l.rate) : "",
+          currencySlot: (l as Labor).currencySlot ?? 1,
         }))
       );
     }
   };
 
   useEffect(() => {
-    fetchLabor().finally(() => setLoading(false));
+    Promise.all([fetchCurrencies(), fetchLabor()]).finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
   const resetForm = () => {
-    setForm({ code: "", name: "", unit: "hr", rate: "" });
+    setForm({ code: "", name: "", unit: "hr", rate: "", currencySlot: 1 });
     setEditId(null);
   };
 
@@ -82,7 +103,10 @@ export default function LaborPage() {
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        currencySlot: Number(form.currencySlot) || 1,
+      }),
     });
     const json = await res.json();
 
@@ -98,7 +122,13 @@ export default function LaborPage() {
 
   const handleEdit = (item: Labor) => {
     setEditId(item.id);
-    setForm({ code: item.code, name: item.name, unit: item.unit, rate: item.rate });
+    setForm({
+      code: item.code,
+      name: item.name,
+      unit: item.unit,
+      rate: item.rate,
+      currencySlot: item.currencySlot ?? 1,
+    });
     setDialogOpen(true);
   };
 
@@ -174,7 +204,28 @@ export default function LaborPage() {
                   />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="rate" className="text-right">Rate</Label>
+                  <Label htmlFor="currency" className="text-right">Currency</Label>
+                  <select
+                    id="currency"
+                    value={form.currencySlot}
+                    onChange={(e) => setForm((f) => ({ ...f, currencySlot: Number(e.target.value) }))}
+                    className="col-span-3 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                  >
+                    {currencies.length > 0
+                      ? currencies.map((c) => (
+                          <option key={c.slot} value={c.slot}>
+                            {c.slot} - {c.code}
+                          </option>
+                        ))
+                      : Array.from({ length: 5 }, (_, i) => (
+                          <option key={i + 1} value={i + 1}>
+                            {i + 1}
+                          </option>
+                        ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="rate" className="text-right">Rate (original currency)</Label>
                   <Input
                     id="rate"
                     type="number"
@@ -210,18 +261,28 @@ export default function LaborPage() {
                 <TableHead>Code</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Unit</TableHead>
-                <TableHead className="text-right">Rate</TableHead>
+                <TableHead>Currency</TableHead>
+                <TableHead className="text-right">Original Rate</TableHead>
+                <TableHead className="text-right">Rate (Main)</TableHead>
                 <TableHead className="w-[70px]" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {labor.map((item) => (
+              {labor.map((item) => {
+                const mult = getMultiplier(item.currencySlot);
+                const rateMain = Number(item.rate) * mult;
+                const curr = currencies.find((c) => c.slot === item.currencySlot);
+                return (
                 <TableRow key={item.id}>
                   <TableCell className="font-mono">{item.code}</TableCell>
                   <TableCell>{item.name}</TableCell>
                   <TableCell>{item.unit}</TableCell>
+                  <TableCell>{curr ? `${curr.slot} - ${curr.code}` : item.currencySlot}</TableCell>
                   <TableCell className="text-right font-mono">
                     {Number(item.rate).toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {rateMain.toFixed(2)}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -246,7 +307,8 @@ export default function LaborPage() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))}
+              );
+              })}
             </TableBody>
           </Table>
         </div>

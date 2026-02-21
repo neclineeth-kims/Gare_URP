@@ -30,11 +30,19 @@ export async function POST(
     const { projectId } = await params;
     const prisma = getPrismaForProject(projectId);
     const body = await req.json();
-    const { code, name, unit, rate } = body;
+    const { code, name, unit, rate, currencySlot } = body;
 
     if (!code || !name || !unit || rate == null) {
       return NextResponse.json(
         { error: "Missing required fields: code, name, unit, rate" },
+        { status: 400 }
+      );
+    }
+
+    const slot = currencySlot != null ? Number(currencySlot) : 1;
+    if (slot < 1 || slot > 5 || !Number.isInteger(slot)) {
+      return NextResponse.json(
+        { error: "currencySlot must be 1-5" },
         { status: 400 }
       );
     }
@@ -46,6 +54,7 @@ export async function POST(
         name: String(name).trim(),
         unit: String(unit).trim(),
         rate: new Decimal(Number(rate)),
+        currencySlot: slot,
       },
     });
     return NextResponse.json({ data: labor });

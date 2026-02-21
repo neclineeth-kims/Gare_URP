@@ -54,6 +54,24 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Use raw SQL because projectCurrency delegate can be undefined in Next.js API routes
+    const currencySlots = [
+      [project.id, 1, "LOCAL", "Local Currency", 1],
+      [project.id, 2, "CUR2", "Currency 2", 1],
+      [project.id, 3, "CUR3", "Currency 3", 1],
+      [project.id, 4, "CUR4", "Currency 4", 1],
+      [project.id, 5, "CUR5", "Currency 5", 1],
+    ];
+    const { randomUUID } = await import("crypto");
+    const now = new Date().toISOString();
+    for (const [projectId, slot, code, name, multiplier] of currencySlots) {
+      const id = randomUUID();
+      await projectPrisma.$executeRaw`
+        INSERT INTO project_currencies (id, project_id, slot, code, name, multiplier, created_at, updated_at)
+        VALUES (${id}, ${projectId}, ${slot}, ${code}, ${name}, ${multiplier}, ${now}, ${now})
+      `;
+    }
+
     await projectPrisma.$disconnect();
 
     registerProject({

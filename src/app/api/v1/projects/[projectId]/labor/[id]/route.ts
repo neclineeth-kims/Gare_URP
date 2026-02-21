@@ -32,21 +32,29 @@ export async function PUT(
     const { projectId, id } = await params;
     const prisma = getPrismaForProject(projectId);
     const body = await req.json();
-    const { code, name, unit, rate } = body;
+    const { code, name, unit, rate, currencySlot } = body;
 
     const existing = await prisma.labor.findFirst({ where: { id, projectId } });
     if (!existing) {
       return NextResponse.json({ error: "Labor not found" }, { status: 404 });
     }
 
+    const updateData: { code?: string; name?: string; unit?: string; rate?: Decimal; currencySlot?: number } = {};
+    if (code != null) updateData.code = String(code).trim();
+    if (name != null) updateData.name = String(name).trim();
+    if (unit != null) updateData.unit = String(unit).trim();
+    if (rate != null) updateData.rate = new Decimal(Number(rate));
+    if (currencySlot != null) {
+      const slot = Number(currencySlot);
+      if (slot < 1 || slot > 5 || !Number.isInteger(slot)) {
+        return NextResponse.json({ error: "currencySlot must be 1-5" }, { status: 400 });
+      }
+      updateData.currencySlot = slot;
+    }
+
     const labor = await prisma.labor.update({
       where: { id },
-      data: {
-        ...(code != null && { code: String(code).trim() }),
-        ...(name != null && { name: String(name).trim() }),
-        ...(unit != null && { unit: String(unit).trim() }),
-        ...(rate != null && { rate: new Decimal(Number(rate)) }),
-      },
+      data: updateData,
     });
     return NextResponse.json({ data: labor });
   } catch (e) {

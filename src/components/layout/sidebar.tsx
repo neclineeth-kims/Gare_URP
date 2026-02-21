@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   HardHat,
+  Coins,
   Users,
   Package,
   Wrench,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 
 const navItems = [
+  { href: "currencies", label: "Currencies", icon: Coins },
   { href: "labor", label: "Labor", icon: Users },
   { href: "materials", label: "Materials", icon: Package },
   { href: "equipment", label: "Equipment", icon: Wrench },

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrismaForProject } from "@/lib/db";
+import { getCurrencyMultipliers, applyConversionToBoqAnalyses } from "@/lib/currency";
 import { explodeProject } from "@/lib/calculations";
 
 export async function GET(
@@ -9,8 +10,9 @@ export async function GET(
   try {
     const { projectId } = await params;
     const prisma = getPrismaForProject(projectId);
+    const multipliers = await getCurrencyMultipliers(prisma, projectId);
 
-    const boqItems = await prisma.boqItem.findMany({
+    const boqItemsRaw = await prisma.boqItem.findMany({
       where: { projectId },
       include: {
       boqAnalyses: {
@@ -35,18 +37,23 @@ export async function GET(
     },
     });
 
+    const boqItems = boqItemsRaw.map((item) => ({
+      ...item,
+      boqAnalyses: applyConversionToBoqAnalyses(item.boqAnalyses, multipliers),
+    }));
+
     const explosion = explodeProject(boqItems);
 
     // Report should show ALL project resources (including unused ones as 0 totals)
     const [allLabor, allMaterials, allEquipment] = await Promise.all([
     prisma.labor.findMany({
       where: { projectId },
-      select: { id: true, code: true, name: true, unit: true, rate: true },
+      select: { id: true, code: true, name: true, unit: true, rate: true, currencySlot: true },
       orderBy: { code: "asc" },
     }),
     prisma.material.findMany({
       where: { projectId },
-      select: { id: true, code: true, name: true, unit: true, rate: true },
+      select: { id: true, code: true, name: true, unit: true, rate: true, currencySlot: true },
       orderBy: { code: "asc" },
     }),
     prisma.equipment.findMany({
@@ -60,25 +67,33 @@ export async function GET(
     const materialUsedById = new Map(explosion.materials.map((m) => [m.resource.id, m.totalQty]));
     const equipmentUsedById = new Map(explosion.equipment.map((e) => [e.resource.id, e]));
 
-    const labor = allLabor.map((l) => ({
-    resource: {
-      code: l.code,
-      name: l.name,
-      unit: l.unit,
-      rate: l.rate.toString(),
-    },
-    totalQty: laborUsedById.get(l.id) ?? 0,
-    }));
+    const { convertRate } = await import("@/lib/currency");
 
-    const materials = allMaterials.map((m) => ({
-    resource: {
-      code: m.code,
-      name: m.name,
-      unit: m.unit,
-      rate: m.rate.toString(),
-    },
-    totalQty: materialUsedById.get(m.id) ?? 0,
-    }));
+    const labor = allLabor.map((l) => {
+      const convertedRate = convertRate(Number(l.rate), l.currencySlot ?? 1, multipliers);
+      return {
+        resource: {
+          code: l.code,
+          name: l.name,
+          unit: l.unit,
+          rate: String(convertedRate),
+        },
+        totalQty: laborUsedById.get(l.id) ?? 0,
+      };
+    });
+
+    const materials = allMaterials.map((m) => {
+      const convertedRate = convertRate(Number(m.rate), m.currencySlot ?? 1, multipliers);
+      return {
+        resource: {
+          code: m.code,
+          name: m.name,
+          unit: m.unit,
+          rate: String(convertedRate),
+        },
+        totalQty: materialUsedById.get(m.id) ?? 0,
+      };
+    });
 
     const equipment = allEquipment.map((e) => {
     const used = equipmentUsedById.get(e.id);
