@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { getPrismaForProject } from "@/lib/db";
 import { Decimal } from "@prisma/client/runtime/library";
 
 export async function PUT(
@@ -8,6 +8,7 @@ export async function PUT(
 ) {
   try {
     const { projectId, id: analysisId, resourceId } = await params;
+    const prisma = getPrismaForProject(projectId);
     const body = await req.json();
     const { quantity } = body;
 
@@ -76,7 +77,7 @@ export async function DELETE(
 ) {
   try {
     const { projectId, id: analysisId, resourceId } = await params;
-
+    const prisma = getPrismaForProject(projectId);
     const analysis = await prisma.analysis.findFirst({
       where: { id: analysisId, projectId },
     });

@@ -123,8 +123,8 @@ export function BoqAnalysisPicker({
               <Label className="text-sm font-medium">Coefficient</Label>
               <Input
                 type="number"
-                step="0.01"
-                min="0.001"
+                step="any"
+                min="0"
                 value={coefficient}
                 onChange={(e) => setCoefficient(e.target.value)}
                 className="mt-1"

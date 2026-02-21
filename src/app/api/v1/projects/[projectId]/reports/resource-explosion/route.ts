@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { getPrismaForProject } from "@/lib/db";
 import { explodeProject } from "@/lib/calculations";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
-  const { projectId } = await params;
+  try {
+    const { projectId } = await params;
+    const prisma = getPrismaForProject(projectId);
 
-  const boqItems = await prisma.boqItem.findMany({
-    where: { projectId },
-    include: {
+    const boqItems = await prisma.boqItem.findMany({
+      where: { projectId },
+      include: {
       boqAnalyses: {
         include: {
           analysis: {
@@ -31,38 +33,82 @@ export async function GET(
         },
       },
     },
-  });
+    });
 
-  const explosion = explodeProject(boqItems);
+    const explosion = explodeProject(boqItems);
 
-  // Serialize Decimal fields for JSON
-  const labor = explosion.labor.map((l) => ({
+    // Report should show ALL project resources (including unused ones as 0 totals)
+    const [allLabor, allMaterials, allEquipment] = await Promise.all([
+    prisma.labor.findMany({
+      where: { projectId },
+      select: { id: true, code: true, name: true, unit: true, rate: true },
+      orderBy: { code: "asc" },
+    }),
+    prisma.material.findMany({
+      where: { projectId },
+      select: { id: true, code: true, name: true, unit: true, rate: true },
+      orderBy: { code: "asc" },
+    }),
+    prisma.equipment.findMany({
+      where: { projectId },
+      select: { id: true, code: true, name: true, unit: true, totalValue: true, depreciationTotal: true },
+      orderBy: { code: "asc" },
+    }),
+    ]);
+
+    const laborUsedById = new Map(explosion.labor.map((l) => [l.resource.id, l.totalQty]));
+    const materialUsedById = new Map(explosion.materials.map((m) => [m.resource.id, m.totalQty]));
+    const equipmentUsedById = new Map(explosion.equipment.map((e) => [e.resource.id, e]));
+
+    const labor = allLabor.map((l) => ({
     resource: {
-      ...l.resource,
-      rate: l.resource.rate.toString(),
+      code: l.code,
+      name: l.name,
+      unit: l.unit,
+      rate: l.rate.toString(),
     },
-    totalQty: l.totalQty,
-  }));
+    totalQty: laborUsedById.get(l.id) ?? 0,
+    }));
 
-  const materials = explosion.materials.map((m) => ({
+    const materials = allMaterials.map((m) => ({
     resource: {
-      ...m.resource,
-      rate: m.resource.rate.toString(),
+      code: m.code,
+      name: m.name,
+      unit: m.unit,
+      rate: m.rate.toString(),
     },
-    totalQty: m.totalQty,
-  }));
+    totalQty: materialUsedById.get(m.id) ?? 0,
+    }));
 
-  return NextResponse.json({
-    data: {
-      labor,
-      materials,
-      equipment: explosion.equipment,
-      totalLaborCost: explosion.totalLaborCost,
-      totalMaterialCost: explosion.totalMaterialCost,
-      totalDirectCost: explosion.totalDirectCost,
-      totalDepreciation: explosion.totalDepreciation,
-      grandTotal: explosion.grandTotal,
-      boqSummary: explosion.boqSummary,
-    },
-  });
+    const equipment = allEquipment.map((e) => {
+    const used = equipmentUsedById.get(e.id);
+    const deprPerUnit = Number(e.depreciationTotal) > 0 ? Number(e.totalValue) / Number(e.depreciationTotal) : 0;
+    const totalHours = used?.totalHours ?? 0;
+    return {
+      resource: { code: e.code, name: e.name, unit: e.unit },
+      totalHours,
+      deprPerUnit: used?.deprPerUnit ?? deprPerUnit,
+      totalDepreciation: totalHours * (used?.deprPerUnit ?? deprPerUnit),
+    };
+    });
+
+    return NextResponse.json({
+      data: {
+          labor,
+        materials,
+        equipment,
+        totalLaborCost: explosion.totalLaborCost,
+        totalMaterialCost: explosion.totalMaterialCost,
+        totalDirectCost: explosion.totalDirectCost,
+        totalDepreciation: explosion.totalDepreciation,
+        grandTotal: explosion.grandTotal,
+        boqSummary: explosion.boqSummary,
+      },
+    });
+  } catch (e) {
+    if (e instanceof Error && e.message.includes("not found")) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+    throw e;
+  }
 }

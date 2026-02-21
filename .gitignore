@@ -41,3 +41,6 @@ next-env.d.ts
 # database files
 dev.db
 *.db
+
+# project data (template and user projects)
+/data/

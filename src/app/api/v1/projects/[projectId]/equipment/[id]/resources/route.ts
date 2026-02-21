@@ -1,33 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { getPrismaForProject } from "@/lib/db";
 import { Decimal } from "@prisma/client/runtime/library";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ projectId: string; id: string }> }
 ) {
-  const { projectId, id: equipmentId } = await params;
+  try {
+    const { projectId, id: equipmentId } = await params;
+    const prisma = getPrismaForProject(projectId);
+    const equipment = await prisma.equipment.findFirst({
+      where: { id: equipmentId, projectId },
+    });
+    if (!equipment) {
+      return NextResponse.json({ error: "Equipment not found" }, { status: 404 });
+    }
 
-  const equipment = await prisma.equipment.findFirst({
-    where: { id: equipmentId, projectId },
-  });
-  if (!equipment) {
-    return NextResponse.json({ error: "Equipment not found" }, { status: 404 });
+    const resources = await prisma.equipmentResource.findMany({
+      where: { equipmentId },
+      include: { labor: true, material: true },
+    });
+
+    const data = resources.map((r) => ({
+      ...r,
+      quantity: r.quantity.toString(),
+      labor: r.labor ? { ...r.labor, rate: r.labor.rate.toString() } : null,
+      material: r.material ? { ...r.material, rate: r.material.rate.toString() } : null,
+    }));
+
+    return NextResponse.json({ data, count: data.length });
+  } catch (e) {
+    if (e instanceof Error && e.message.includes("not found")) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+    throw e;
   }
-
-  const resources = await prisma.equipmentResource.findMany({
-    where: { equipmentId },
-    include: { labor: true, material: true },
-  });
-
-  const data = resources.map((r) => ({
-    ...r,
-    quantity: r.quantity.toString(),
-    labor: r.labor ? { ...r.labor, rate: r.labor.rate.toString() } : null,
-    material: r.material ? { ...r.material, rate: r.material.rate.toString() } : null,
-  }));
-
-  return NextResponse.json({ data, count: data.length });
 }
 
 export async function POST(
@@ -36,6 +43,7 @@ export async function POST(
 ) {
   try {
     const { projectId, id: equipmentId } = await params;
+    const prisma = getPrismaForProject(projectId);
     const body = await req.json();
     const { resource_type, labor_id, material_id, quantity } = body;
 

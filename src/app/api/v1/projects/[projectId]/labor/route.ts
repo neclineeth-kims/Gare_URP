@@ -1,17 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { getPrismaForProject } from "@/lib/db";
 import { Decimal } from "@prisma/client/runtime/library";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
-  const { projectId } = await params;
-  const labor = await prisma.labor.findMany({
+  try {
+    const { projectId } = await params;
+    const prisma = getPrismaForProject(projectId);
+    const labor = await prisma.labor.findMany({
     where: { projectId },
     orderBy: { code: "asc" },
-  });
-  return NextResponse.json({ data: labor, count: labor.length });
+    });
+    return NextResponse.json({ data: labor, count: labor.length });
+  } catch (e) {
+    if (e instanceof Error && e.message.includes("not found")) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+    throw e;
+  }
 }
 
 export async function POST(
@@ -20,6 +28,7 @@ export async function POST(
 ) {
   try {
     const { projectId } = await params;
+    const prisma = getPrismaForProject(projectId);
     const body = await req.json();
     const { code, name, unit, rate } = body;
 

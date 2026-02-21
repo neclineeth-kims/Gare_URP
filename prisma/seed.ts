@@ -252,6 +252,24 @@ async function main() {
     ],
   });
 
+  // Second BoQ item: single analysis (7001 only)
+  const boqItem9002 = await prisma.boqItem.create({
+    data: {
+      projectId: project.id,
+      code: "9002",
+      name: "Excavation - Standard Only",
+      unit: "cum",
+      quantity: 50000,
+    },
+  });
+  await prisma.boqAnalysis.create({
+    data: {
+      boqItemId: boqItem9002.id,
+      analysisId: analysis7001.id,
+      coefficient: 1,
+    },
+  });
+
   console.log("Seed completed successfully!");
   console.log("Project:", project.name, "ID:", project.id);
 }

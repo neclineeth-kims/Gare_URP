@@ -1,22 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { getPrismaForProject } from "@/lib/db";
 import { Decimal } from "@prisma/client/runtime/library";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ projectId: string; id: string }> }
 ) {
-  const { projectId, id: boqItemId } = await params;
+  try {
+    const { projectId, id: boqItemId } = await params;
+    const prisma = getPrismaForProject(projectId);
+    const boqItem = await prisma.boqItem.findFirst({
+      where: { id: boqItemId, projectId },
+    });
+    if (!boqItem) {
+      return NextResponse.json({ error: "BoQ item not found" }, { status: 404 });
+    }
 
-  const boqItem = await prisma.boqItem.findFirst({
-    where: { id: boqItemId, projectId },
-  });
-  if (!boqItem) {
-    return NextResponse.json({ error: "BoQ item not found" }, { status: 404 });
-  }
-
-  const boqAnalyses = await prisma.boqAnalysis.findMany({
-    where: { boqItemId },
+    const boqAnalyses = await prisma.boqAnalysis.findMany({
+      where: { boqItemId },
     include: {
       analysis: {
         include: {
@@ -34,18 +35,24 @@ export async function GET(
         },
       },
     },
-  });
+    });
 
-  const data = boqAnalyses.map((ba) => ({
-    ...ba,
-    coefficient: ba.coefficient.toString(),
-    analysis: {
-      ...ba.analysis,
-      baseQuantity: ba.analysis.baseQuantity.toString(),
-    },
-  }));
+    const data = boqAnalyses.map((ba) => ({
+      ...ba,
+      coefficient: ba.coefficient.toString(),
+      analysis: {
+        ...ba.analysis,
+        baseQuantity: ba.analysis.baseQuantity.toString(),
+      },
+    }));
 
-  return NextResponse.json({ data, count: data.length });
+    return NextResponse.json({ data, count: data.length });
+  } catch (e) {
+    if (e instanceof Error && e.message.includes("not found")) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+    throw e;
+  }
 }
 
 export async function POST(
@@ -54,6 +61,7 @@ export async function POST(
 ) {
   try {
     const { projectId, id: boqItemId } = await params;
+    const prisma = getPrismaForProject(projectId);
     const body = await req.json();
     const { analysis_id, coefficient } = body;
 

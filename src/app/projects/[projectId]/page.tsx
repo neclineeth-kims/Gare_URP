@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { prisma } from "@/lib/db";
+import { getPrismaForProject } from "@/lib/projects";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Package, Wrench, BarChart3, ClipboardList } from "lucide-react";
 
@@ -9,6 +9,7 @@ export default async function ProjectOverviewPage({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await params;
+  const prisma = getPrismaForProject(projectId);
 
   const [laborCount, materialsCount, equipmentCount, analysisCount, boqCount] = await Promise.all([
     prisma.labor.count({ where: { projectId } }),

@@ -1,19 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { getPrismaForProject } from "@/lib/db";
 import { Decimal } from "@prisma/client/runtime/library";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ projectId: string; id: string }> }
 ) {
-  const { projectId, id } = await params;
-  const material = await prisma.material.findFirst({
+  try {
+    const { projectId, id } = await params;
+    const prisma = getPrismaForProject(projectId);
+    const material = await prisma.material.findFirst({
     where: { id, projectId },
-  });
-  if (!material) {
-    return NextResponse.json({ error: "Material not found" }, { status: 404 });
+    });
+    if (!material) {
+      return NextResponse.json({ error: "Material not found" }, { status: 404 });
+    }
+    return NextResponse.json({ data: material });
+  } catch (e) {
+    if (e instanceof Error && e.message.includes("not found")) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+    throw e;
   }
-  return NextResponse.json({ data: material });
 }
 
 export async function PUT(
@@ -22,6 +30,7 @@ export async function PUT(
 ) {
   try {
     const { projectId, id } = await params;
+    const prisma = getPrismaForProject(projectId);
     const body = await req.json();
     const { code, name, unit, rate } = body;
 
@@ -55,6 +64,7 @@ export async function DELETE(
 ) {
   try {
     const { projectId, id } = await params;
+    const prisma = getPrismaForProject(projectId);
     const existing = await prisma.material.findFirst({ where: { id, projectId } });
     if (!existing) {
       return NextResponse.json({ error: "Material not found" }, { status: 404 });

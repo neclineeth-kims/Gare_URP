@@ -56,12 +56,11 @@ cd unit-rate-app
 npm install
 ```
 
-3. Set up the database:
+3. Set up the template database (required before creating projects):
 ```bash
-npx prisma generate
-npx prisma db push
-npx prisma db seed
+npm run init:template
 ```
+This creates `data/unitrate_main/` with empty schema and base currency (USD).
 
 4. Start the development server:
 ```bash
@@ -72,10 +71,16 @@ npm run dev
 
 ### Environment Setup
 
-Create a `.env` file in the root directory:
+Create a `.env` file in the root directory (used for migrations and template setup):
 ```env
 DATABASE_URL="file:./dev.db"
 ```
+
+### Project-Based Architecture
+
+- **Landing page** – Choose to start a new project or open an existing one.
+- **New project** – Creates a directory under `data/projects/<name>/` with a copy of the template database.
+- **Existing project** – Opens the project’s database and shows all labor, materials, equipment, and analysis.
 
 ## Application Architecture
 

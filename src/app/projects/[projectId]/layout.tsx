@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
+import { getPrismaForProject } from "@/lib/projects";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
@@ -13,6 +13,12 @@ export default async function ProjectLayout({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await params;
+  let prisma;
+  try {
+    prisma = getPrismaForProject(projectId);
+  } catch {
+    notFound();
+  }
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: { currency: true },
