@@ -41,6 +41,17 @@ async function main() {
     },
   });
 
+  // 2b. Project currencies (5 slots)
+  await prisma.projectCurrency.createMany({
+    data: [
+      { projectId: project.id, slot: 1, code: "USD", name: "US Dollar", multiplier: 1 },
+      { projectId: project.id, slot: 2, code: "CUR2", name: "Currency 2", multiplier: 1 },
+      { projectId: project.id, slot: 3, code: "CUR3", name: "Currency 3", multiplier: 1 },
+      { projectId: project.id, slot: 4, code: "CUR4", name: "Currency 4", multiplier: 1 },
+      { projectId: project.id, slot: 5, code: "CUR5", name: "Currency 5", multiplier: 1 },
+    ],
+  });
+
   // 3. Labor
   const labor1001 = await prisma.labor.create({
     data: {

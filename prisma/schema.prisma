@@ -1,13 +1,14 @@
 // Unit Rate Calculation App - Database Schema
-// SPEC.md Section 8 (adapted for SQLite)
+// PostgreSQL (Supabase) for production / Vercel deployment
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Currency {
@@ -55,6 +56,7 @@ model ProjectCurrency {
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   @@unique([projectId, slot])
+  @@index([projectId])
   @@map("project_currencies")
 }
 
@@ -73,6 +75,7 @@ model Labor {
   updatedAt          DateTime            @updatedAt @map("updated_at")
 
   @@unique([projectId, code])
+  @@index([projectId])
   @@map("labor")
 }
 
@@ -91,6 +94,7 @@ model Material {
   updatedAt          DateTime            @updatedAt @map("updated_at")
 
   @@unique([projectId, code])
+  @@index([projectId])
   @@map("materials")
 }
 
@@ -109,6 +113,7 @@ model Equipment {
   updatedAt         DateTime            @updatedAt @map("updated_at")
 
   @@unique([projectId, code])
+  @@index([projectId])
   @@map("equipment")
 }
 
@@ -142,6 +147,7 @@ model Analysis {
   updatedAt    DateTime           @updatedAt @map("updated_at")
 
   @@unique([projectId, code])
+  @@index([projectId])
   @@map("analysis")
 }
 
@@ -175,6 +181,7 @@ model BoqItem {
   updatedAt   DateTime     @updatedAt @map("updated_at")
 
   @@unique([projectId, code])
+  @@index([projectId])
   @@map("boq_items")
 }
 

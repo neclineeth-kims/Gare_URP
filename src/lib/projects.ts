@@ -1,12 +1,12 @@
 /**
- * Project registry and directory management.
- * Projects live in ./data/projects/<name>/ with their own SQLite DB.
- * unitrate_main is the template with empty schema + currencies.
+ * Project registry and database management.
+ * Single Supabase PostgreSQL database with projectId row-level isolation.
+ * Registry (projects.json) tracks project metadata. Path retained for migration only.
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, rmSync } from "fs";
 import path from "path";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "./db";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 export const UNITRATE_MAIN_PATH = path.join(DATA_DIR, "unitrate_main");
@@ -94,15 +94,22 @@ export function unregisterProject(projectId: string): boolean {
   return true;
 }
 
-/** Delete project: unregister and remove project folder from disk */
-export function deleteProject(projectId: string): void {
+/** Delete project: unregister, remove from DB (cascade), and optionally remove SQLite folder if present */
+export async function deleteProject(projectId: string): Promise<void> {
   const entry = getProjectById(projectId);
   if (!entry) {
     throw new Error(`Project not found: ${projectId}`);
   }
   unregisterProject(projectId);
+  await prisma.project.delete({ where: { id: projectId } }).catch(() => {
+    // Project may not exist in DB (legacy registry-only)
+  });
   if (existsSync(entry.path)) {
-    rmSync(entry.path, { recursive: true });
+    try {
+      rmSync(entry.path, { recursive: true });
+    } catch {
+      // Ignore file delete errors (e.g. migration leftovers)
+    }
   }
 }
 
@@ -130,10 +137,9 @@ export async function updateProjectName(projectId: string, newName: string): Pro
   entries[idx] = { ...entries[idx], name: trimmed };
   writeRegistry(entries);
   try {
-    const prisma = getPrismaForProject(projectId);
     await prisma.project.update({ where: { id: projectId }, data: { name: trimmed } });
   } catch {
-    // Registry updated; DB update optional (project may be broken)
+    // Registry updated; DB update optional (project may not exist in DB)
   }
 }
 
@@ -181,11 +187,18 @@ export function createProjectDirectory(projectName: string): string {
   return projectDir;
 }
 
-/** Prisma client cache per DB path */
-const prismaCache = new Map<string, PrismaClient>();
+/** Returns global Prisma client. Validates project exists in registry. */
+export function getPrismaForProject(projectId: string): typeof prisma {
+  const entry = getProjectById(projectId);
+  if (!entry) {
+    throw new Error(`Project not found: ${projectId}`);
+  }
+  return prisma;
+}
 
-/** Create Prisma client for a database at given path (e.g. before project is registered) */
-export function getPrismaForPath(projectPath: string): PrismaClient {
+/** @deprecated Migration only. Creates Prisma client for SQLite at path. */
+export function getPrismaForPath(projectPath: string) {
+  const { PrismaClient } = require("@prisma/client");
   const dbPath = getProjectDbPath(projectPath);
   if (!existsSync(dbPath)) {
     throw new Error(`Database not found at ${dbPath}`);
@@ -195,30 +208,4 @@ export function getPrismaForPath(projectPath: string): PrismaClient {
     datasources: { db: { url } },
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
-}
-
-/** Get Prisma client for a project's database */
-export function getPrismaForProject(projectId: string): PrismaClient {
-  const entry = getProjectById(projectId);
-  if (!entry) {
-    throw new Error(`Project not found: ${projectId}`);
-  }
-
-  const dbPath = getProjectDbPath(entry.path);
-  if (!existsSync(dbPath)) {
-    throw new Error(`Project database not found at ${dbPath}`);
-  }
-
-  const url = `file:${dbPath.replace(/\\/g, "/")}`;
-  let client = prismaCache.get(url);
-  if (!client) {
-    client = new PrismaClient({
-      datasources: {
-        db: { url },
-      },
-      log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-    });
-    prismaCache.set(url, client);
-  }
-  return client;
 }
