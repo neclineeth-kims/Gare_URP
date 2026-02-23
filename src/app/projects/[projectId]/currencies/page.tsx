@@ -234,10 +234,9 @@ export default function CurrenciesPage() {
                     />
                   </TableCell>
                   <TableCell className="font-mono text-muted-foreground">
-                    {(mainMultiplier > 0
-                      ? (Number(row.multiplier) || 1) / mainMultiplier
-                      : "-"
-                    ).toFixed(4)}
+                    {mainMultiplier > 0
+                      ? ((Number(row.multiplier) || 1) / mainMultiplier).toFixed(4)
+                      : "-"}
                   </TableCell>
                 </TableRow>
               ))}
