@@ -16,7 +16,7 @@ export async function GET(
 ) {
   try {
     const { projectId, id } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const item = await getBoqItemById(prisma, projectId, id);
 
     if (!item) {
@@ -88,7 +88,7 @@ export async function PUT(
 ) {
   try {
     const { projectId, id } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
     const { code, name, unit, quantity, analyses } = body;
 
@@ -167,7 +167,7 @@ export async function DELETE(
 ) {
   try {
     const { projectId, id } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     await deleteBoqItem(prisma, projectId, id);
     return new NextResponse(null, { status: 204 });
   } catch (e) {

@@ -16,7 +16,7 @@ export async function GET(
 ) {
   try {
     const { projectId, id } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const equipment = await getEquipmentById(prisma, projectId, id);
 
     if (!equipment) {
@@ -59,7 +59,7 @@ export async function PUT(
 ) {
   try {
     const { projectId, id } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
     const {
       code,
@@ -129,7 +129,7 @@ export async function DELETE(
 ) {
   try {
     const { projectId, id } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     await deleteEquipment(prisma, projectId, id);
     return new NextResponse(null, { status: 204 });
   } catch (e) {

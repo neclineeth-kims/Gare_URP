@@ -10,7 +10,7 @@ export async function PUT(
 ) {
   try {
     const { projectId, id: equipmentId, resourceId } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
     const { quantity } = body;
 
@@ -68,7 +68,7 @@ export async function DELETE(
 ) {
   try {
     const { projectId, id: equipmentId, resourceId } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const equipment = await prisma.equipment.findFirst({
       where: { id: equipmentId, projectId },
     });

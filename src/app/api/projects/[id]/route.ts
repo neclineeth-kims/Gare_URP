@@ -17,7 +17,7 @@ export async function PATCH(
       );
     }
 
-    if (!getProjectById(id)) {
+    if (!(await getProjectById(id))) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
@@ -38,7 +38,7 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    if (!getProjectById(id)) {
+    if (!(await getProjectById(id))) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 

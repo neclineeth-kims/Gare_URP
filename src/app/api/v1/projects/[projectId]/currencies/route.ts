@@ -41,7 +41,7 @@ export async function GET(
 ) {
   try {
     const { projectId } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
 
     const data = await getCurrencies(prisma as Parameters<typeof getCurrencies>[0], projectId);
 
@@ -62,7 +62,7 @@ export async function PUT(
 ) {
   try {
     const { projectId } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
 
     const items = body as CurrencyUpdate[];
@@ -169,7 +169,7 @@ export async function POST(
       return NextResponse.json({ error: "Slot 1 is already main" }, { status: 400 });
     }
 
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const rows = await getCurrencies(prisma as Parameters<typeof getCurrencies>[0], projectId);
 
     if (rows.length !== 5) {

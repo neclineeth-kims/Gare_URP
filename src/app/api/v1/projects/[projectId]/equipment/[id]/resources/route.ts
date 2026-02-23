@@ -10,7 +10,7 @@ export async function GET(
 ) {
   try {
     const { projectId, id: equipmentId } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const equipment = await prisma.equipment.findFirst({
       where: { id: equipmentId, projectId },
     });
@@ -45,7 +45,7 @@ export async function POST(
 ) {
   try {
     const { projectId, id: equipmentId } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
     const { resource_type, labor_id, material_id, quantity } = body;
 

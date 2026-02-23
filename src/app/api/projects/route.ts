@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  registerProject,
-  validateProjectName,
-  getProjectByName,
-} from "@/lib/projects";
+import { validateProjectName, getProjectByName } from "@/lib/projects";
 import { prisma } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
@@ -23,7 +19,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    if (getProjectByName(name)) {
+    if (await getProjectByName(name)) {
       return NextResponse.json(
         { error: `A project named "${name}" already exists` },
         { status: 400 }
@@ -59,19 +55,11 @@ export async function POST(req: NextRequest) {
       ],
     });
 
-    const pathPlaceholder = `supabase:${project.id}`;
-    registerProject({
-      id: project.id,
-      name: project.name,
-      path: pathPlaceholder,
-      createdAt: new Date().toISOString(),
-    });
-
     return NextResponse.json({
       data: {
         id: project.id,
         name: project.name,
-        path: pathPlaceholder,
+        path: `supabase:${project.id}`,
       },
     });
   } catch (e) {

@@ -13,7 +13,7 @@ export default async function EquipmentPage({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await params;
-  const prisma = getPrismaForProject(projectId);
+  const prisma = await getPrismaForProject(projectId);
   const initialEquipment = await getEquipmentList(prisma, projectId);
 
   // Convert Decimal objects to numbers for client component serialization

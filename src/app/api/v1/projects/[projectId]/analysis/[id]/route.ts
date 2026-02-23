@@ -16,7 +16,7 @@ export async function GET(
 ) {
   try {
     const { projectId, id } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const analysis = await getAnalysisById(prisma, projectId, id);
 
     if (!analysis) {
@@ -101,7 +101,7 @@ export async function PUT(
 ) {
   try {
     const { projectId, id } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
     const { code, name, unit, base_quantity, resources } = body;
 
@@ -197,7 +197,7 @@ export async function DELETE(
 ) {
   try {
     const { projectId, id } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     await deleteAnalysis(prisma, projectId, id);
     return new NextResponse(null, { status: 204 });
   } catch (e) {

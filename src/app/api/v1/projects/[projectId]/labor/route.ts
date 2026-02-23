@@ -10,7 +10,7 @@ export async function GET(
 ) {
   try {
     const { projectId } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const labor = await prisma.labor.findMany({
     where: { projectId },
     orderBy: { code: "asc" },
@@ -30,7 +30,7 @@ export async function POST(
 ) {
   try {
     const { projectId } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
     const { code, name, unit, rate, currencySlot } = body;
 

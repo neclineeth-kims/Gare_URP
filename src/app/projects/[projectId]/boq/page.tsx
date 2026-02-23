@@ -14,7 +14,7 @@ export default async function BoqPage({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await params;
-  const prisma = getPrismaForProject(projectId);
+  const prisma = await getPrismaForProject(projectId);
   const items = await getBoqItems(prisma, projectId, { sort: "code" });
 
   const serializedItems: BoqItemWithCosts[] = items.map((item) => ({

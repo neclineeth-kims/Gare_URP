@@ -9,7 +9,7 @@ export default async function ProjectOverviewPage({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await params;
-  const prisma = getPrismaForProject(projectId);
+  const prisma = await getPrismaForProject(projectId);
 
   const [currencyCount, laborCount, materialsCount, equipmentCount, analysisCount, boqCount] =
     await Promise.all([

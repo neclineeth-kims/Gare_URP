@@ -11,7 +11,7 @@ export async function GET(
 ) {
   try {
     const { projectId } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const multipliers = await getCurrencyMultipliers(prisma, projectId);
 
     const boqItemsRaw = await prisma.boqItem.findMany({

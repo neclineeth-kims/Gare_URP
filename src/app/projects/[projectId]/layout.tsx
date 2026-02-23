@@ -16,7 +16,7 @@ export default async function ProjectLayout({
   const { projectId } = await params;
   let prisma;
   try {
-    prisma = getPrismaForProject(projectId);
+    prisma = await getPrismaForProject(projectId);
   } catch {
     notFound();
   }

@@ -1,10 +1,9 @@
 /**
  * Project registry and database management.
- * Single Supabase PostgreSQL database with projectId row-level isolation.
- * Registry (projects.json) tracks project metadata. Path retained for migration only.
+ * Single Supabase PostgreSQL database. All project data lives in the Project table.
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, rmSync } from "fs";
+import { existsSync, mkdirSync, copyFileSync } from "fs";
 import path from "path";
 import { PrismaClient } from "@prisma/client";
 import { prisma } from "./db";
@@ -13,7 +12,6 @@ const DATA_DIR = path.join(process.cwd(), "data");
 export const UNITRATE_MAIN_PATH = path.join(DATA_DIR, "unitrate_main");
 export const UNITRATE_MAIN_DB = path.join(UNITRATE_MAIN_PATH, "unitrate.db");
 export const PROJECTS_DIR = path.join(DATA_DIR, "projects");
-const REGISTRY_PATH = path.join(DATA_DIR, "projects.json");
 
 export type ProjectEntry = {
   id: string;
@@ -22,102 +20,74 @@ export type ProjectEntry = {
   createdAt: string;
 };
 
-function ensureDataDir() {
-  if (!existsSync(DATA_DIR)) {
-    mkdirSync(DATA_DIR, { recursive: true });
-  }
+function projectToEntry(p: { id: string; name: string; createdAt: Date }): ProjectEntry {
+  return {
+    id: p.id,
+    name: p.name,
+    path: `supabase:${p.id}`,
+    createdAt: p.createdAt.toISOString(),
+  };
 }
 
-function readRegistry(): ProjectEntry[] {
-  ensureDataDir();
-  if (!existsSync(REGISTRY_PATH)) {
-    writeFileSync(REGISTRY_PATH, "[]", "utf-8");
-    return [];
-  }
-  const raw = readFileSync(REGISTRY_PATH, "utf-8");
-  try {
-    return JSON.parse(raw) as ProjectEntry[];
-  } catch {
-    return [];
-  }
-}
-
-function writeRegistry(entries: ProjectEntry[]) {
-  ensureDataDir();
-  writeFileSync(REGISTRY_PATH, JSON.stringify(entries, null, 2), "utf-8");
-}
-
-/** Get all registered projects */
-export function getProjects(): ProjectEntry[] {
-  return readRegistry();
+/** Get all projects from database */
+export async function getProjects(): Promise<ProjectEntry[]> {
+  const projects = await prisma.project.findMany({
+    orderBy: { createdAt: "desc" },
+    select: { id: true, name: true, createdAt: true },
+  });
+  return projects.map(projectToEntry);
 }
 
 /** Get project by ID */
-export function getProjectById(projectId: string): ProjectEntry | null {
-  return readRegistry().find((p) => p.id === projectId) ?? null;
+export async function getProjectById(projectId: string): Promise<ProjectEntry | null> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { id: true, name: true, createdAt: true },
+  });
+  return project ? projectToEntry(project) : null;
 }
 
 /** Get project by name (case-insensitive search) */
-export function getProjectByName(name: string): ProjectEntry | null {
-  const lower = name.toLowerCase().trim();
-  return readRegistry().find((p) => p.name.toLowerCase() === lower) ?? null;
+export async function getProjectByName(name: string): Promise<ProjectEntry | null> {
+  const project = await prisma.project.findFirst({
+    where: {
+      name: { equals: name.trim(), mode: "insensitive" },
+    },
+    select: { id: true, name: true, createdAt: true },
+  });
+  return project ? projectToEntry(project) : null;
 }
 
-/** Search projects by name */
-export function searchProjects(query: string): ProjectEntry[] {
+/** Search projects by name or ID */
+export async function searchProjects(query: string): Promise<ProjectEntry[]> {
   const lower = query.toLowerCase().trim();
-  if (!lower) return readRegistry();
-  return readRegistry().filter(
-    (p) =>
-      p.name.toLowerCase().includes(lower) ||
-      p.id.toLowerCase().includes(lower)
-  );
+  if (!lower) return getProjects();
+  const projects = await prisma.project.findMany({
+    where: {
+      OR: [
+        { name: { contains: lower, mode: "insensitive" } },
+        { id: { contains: lower, mode: "insensitive" } },
+      ],
+    },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, name: true, createdAt: true },
+  });
+  return projects.map(projectToEntry);
 }
 
-/** Register a new project */
-export function registerProject(entry: ProjectEntry): void {
-  const entries = readRegistry();
-  if (entries.some((p) => p.id === entry.id)) {
-    throw new Error(`Project with id ${entry.id} already registered`);
-  }
-  if (entries.some((p) => p.name.toLowerCase() === entry.name.toLowerCase())) {
-    throw new Error(`Project with name "${entry.name}" already exists`);
-  }
-  entries.push(entry);
-  writeRegistry(entries);
-}
-
-/** Remove project from registry (does not delete files) */
-export function unregisterProject(projectId: string): boolean {
-  const entries = readRegistry().filter((p) => p.id !== projectId);
-  if (entries.length === readRegistry().length) return false;
-  writeRegistry(entries);
-  return true;
-}
-
-/** Delete project: unregister, remove from DB (cascade), and optionally remove SQLite folder if present */
+/** Delete project from database (cascade deletes related data) */
 export async function deleteProject(projectId: string): Promise<void> {
-  const entry = getProjectById(projectId);
-  if (!entry) {
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) {
     throw new Error(`Project not found: ${projectId}`);
   }
-  unregisterProject(projectId);
-  await prisma.project.delete({ where: { id: projectId } }).catch(() => {
-    // Project may not exist in DB (legacy registry-only)
-  });
-  if (existsSync(entry.path)) {
-    try {
-      rmSync(entry.path, { recursive: true });
-    } catch {
-      // Ignore file delete errors (e.g. migration leftovers)
-    }
-  }
+  await prisma.project.delete({ where: { id: projectId } });
 }
 
-/** Update project name in registry and in the project database */
+/** Update project name in database */
 export async function updateProjectName(projectId: string, newName: string): Promise<void> {
-  const entry = getProjectById(projectId);
-  if (!entry) {
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) {
     throw new Error(`Project not found: ${projectId}`);
   }
   const validation = validateProjectName(newName);
@@ -125,23 +95,16 @@ export async function updateProjectName(projectId: string, newName: string): Pro
     throw new Error(validation.error);
   }
   const trimmed = newName.trim();
-  const lower = trimmed.toLowerCase();
-  const existing = readRegistry().find(
-    (p) => p.id !== projectId && p.name.toLowerCase() === lower
-  );
+  const existing = await prisma.project.findFirst({
+    where: {
+      id: { not: projectId },
+      name: { equals: trimmed, mode: "insensitive" },
+    },
+  });
   if (existing) {
     throw new Error(`A project named "${trimmed}" already exists`);
   }
-  const entries = readRegistry();
-  const idx = entries.findIndex((p) => p.id === projectId);
-  if (idx === -1) return;
-  entries[idx] = { ...entries[idx], name: trimmed };
-  writeRegistry(entries);
-  try {
-    await prisma.project.update({ where: { id: projectId }, data: { name: trimmed } });
-  } catch {
-    // Registry updated; DB update optional (project may not exist in DB)
-  }
+  await prisma.project.update({ where: { id: projectId }, data: { name: trimmed } });
 }
 
 /** Validate project name: no path traversal, no reserved chars */
@@ -162,12 +125,12 @@ export function validateProjectName(name: string): { valid: boolean; error?: str
   return { valid: true };
 }
 
-/** Get the DB path for a project */
+/** Get the DB path for a project (migration script only) */
 export function getProjectDbPath(projectPath: string): string {
   return path.join(projectPath, "unitrate.db");
 }
 
-/** Create project directory and copy template DB */
+/** Create project directory and copy template DB (local/migration only) */
 export function createProjectDirectory(projectName: string): string {
   if (!existsSync(UNITRATE_MAIN_DB)) {
     throw new Error(
@@ -188,10 +151,10 @@ export function createProjectDirectory(projectName: string): string {
   return projectDir;
 }
 
-/** Returns global Prisma client. Validates project exists in registry. */
-export function getPrismaForProject(projectId: string): typeof prisma {
-  const entry = getProjectById(projectId);
-  if (!entry) {
+/** Returns global Prisma client. Validates project exists in database. */
+export async function getPrismaForProject(projectId: string): Promise<typeof prisma> {
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) {
     throw new Error(`Project not found: ${projectId}`);
   }
   return prisma;

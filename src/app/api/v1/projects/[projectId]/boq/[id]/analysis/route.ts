@@ -10,7 +10,7 @@ export async function GET(
 ) {
   try {
     const { projectId, id: boqItemId } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const boqItem = await prisma.boqItem.findFirst({
       where: { id: boqItemId, projectId },
     });
@@ -63,7 +63,7 @@ export async function POST(
 ) {
   try {
     const { projectId, id: boqItemId } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
     const { analysis_id, coefficient } = body;
 

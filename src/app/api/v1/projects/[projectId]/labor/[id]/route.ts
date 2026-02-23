@@ -10,7 +10,7 @@ export async function GET(
 ) {
   try {
     const { projectId, id } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const labor = await prisma.labor.findFirst({
     where: { id, projectId },
     });
@@ -32,7 +32,7 @@ export async function PUT(
 ) {
   try {
     const { projectId, id } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
     const { code, name, unit, rate, currencySlot } = body;
 
@@ -74,7 +74,7 @@ export async function DELETE(
 ) {
   try {
     const { projectId, id } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const existing = await prisma.labor.findFirst({ where: { id, projectId } });
     if (!existing) {
       return NextResponse.json({ error: "Labor not found" }, { status: 404 });

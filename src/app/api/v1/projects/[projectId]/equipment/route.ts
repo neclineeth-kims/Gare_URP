@@ -16,7 +16,7 @@ export async function GET(
 ) {
   try {
     const { projectId } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search") || undefined;
     const sort = (searchParams.get("sort") as "code" | "name" | null) || undefined;
@@ -81,7 +81,7 @@ export async function POST(
 ) {
   try {
     const { projectId } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
     const {
       code,

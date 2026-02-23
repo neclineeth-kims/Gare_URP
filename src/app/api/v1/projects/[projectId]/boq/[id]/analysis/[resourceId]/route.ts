@@ -10,7 +10,7 @@ export async function PUT(
 ) {
   try {
     const { projectId, id: boqItemId, resourceId } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
     const { coefficient } = body;
 
@@ -90,7 +90,7 @@ export async function DELETE(
 ) {
   try {
     const { projectId, id: boqItemId, resourceId } = await params;
-    const prisma = getPrismaForProject(projectId);
+    const prisma = await getPrismaForProject(projectId);
     const boqItem = await prisma.boqItem.findFirst({
       where: { id: boqItemId, projectId },
     });
