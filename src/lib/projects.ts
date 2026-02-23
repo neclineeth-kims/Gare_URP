@@ -6,6 +6,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, rmSync } from "fs";
 import path from "path";
+import { PrismaClient } from "@prisma/client";
 import { prisma } from "./db";
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -198,7 +199,6 @@ export function getPrismaForProject(projectId: string): typeof prisma {
 
 /** @deprecated Migration only. Creates Prisma client for SQLite at path. */
 export function getPrismaForPath(projectPath: string) {
-  const { PrismaClient } = require("@prisma/client");
   const dbPath = getProjectDbPath(projectPath);
   if (!existsSync(dbPath)) {
     throw new Error(`Database not found at ${dbPath}`);

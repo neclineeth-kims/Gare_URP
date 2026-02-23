@@ -8,6 +8,8 @@ type AnalysisResourceRequestBody = {
   quantity: number | string;
 };
 
+export const dynamic = "force-dynamic";
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ projectId: string; id: string }> }

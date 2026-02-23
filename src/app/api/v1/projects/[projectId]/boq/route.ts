@@ -7,6 +7,8 @@ import {
 } from "@/lib/db";
 import { computeAnalysisCosts } from "@/lib/calculations";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
