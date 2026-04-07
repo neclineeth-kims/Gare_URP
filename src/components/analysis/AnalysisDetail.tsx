@@ -414,7 +414,8 @@ export default function AnalysisDetail({
                       setCode(e.target.value);
                       if (errors.code) setErrors({ ...errors, code: undefined });
                     }}
-                    placeholder="7001"
+                    placeholder="AN001"
+                    maxLength={6}
                     aria-required="true"
                     aria-invalid={!!errors.code}
                     aria-describedby={errors.code ? "code-error" : undefined}

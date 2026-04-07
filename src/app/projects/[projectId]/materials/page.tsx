@@ -177,7 +177,8 @@ export default function MaterialsPage() {
                     value={form.code}
                     onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
                     className="col-span-3"
-                    placeholder="e.g. 2001"
+                    placeholder="e.g. MAT001"
+                    maxLength={6}
                     required
                   />
                 </div>

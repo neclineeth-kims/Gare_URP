@@ -177,7 +177,8 @@ export default function LaborPage() {
                     value={form.code}
                     onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
                     className="col-span-3"
-                    placeholder="e.g. 1001"
+                    placeholder="e.g. LAB001"
+                    maxLength={6}
                     required
                   />
                 </div>

@@ -194,7 +194,8 @@ export default function BoqDetail({
                       setCode(e.target.value);
                       if (errors.code) setErrors((p) => ({ ...p, code: "" }));
                     }}
-                    placeholder="e.g. 9001"
+                    placeholder="e.g. BOQ001"
+                    maxLength={6}
                     aria-invalid={!!errors.code}
                     aria-describedby={errors.code ? "boq-code-error" : undefined}
                   />

@@ -252,6 +252,7 @@ export default function EquipmentDetail({
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
                     placeholder="EQ001"
+                    maxLength={6}
                     aria-required="true"
                   />
                 </div>
