@@ -49,12 +49,21 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/v1/projects/${projectId}/reports/resource-explosion`)
+    const controller = new AbortController();
+
+    fetch(`/api/v1/projects/${projectId}/reports/resource-explosion`, {
+      signal: controller.signal,
+    })
       .then((r) => r.json())
       .then((json) => {
         if (json.data) setData(json.data);
       })
+      .catch((err) => {
+        if (err.name !== "AbortError") console.error("Report fetch error:", err);
+      })
       .finally(() => setLoading(false));
+
+    return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
