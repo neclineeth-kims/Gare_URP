@@ -5,7 +5,6 @@ import { useAnalysisManager } from "@/hooks/useAnalysisManager";
 import AnalysisTable from "./AnalysisTable";
 import AnalysisDetail from "./AnalysisDetail";
 import type { AnalysisWithCostsClient } from "@/types/analysis";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,6 +15,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 type AnalysisPageClientProps = {
   projectId: string;
@@ -37,11 +39,17 @@ export default function AnalysisPageClient({
     useAnalysisManager(projectId, initialAnalyses);
 
   const selectedAnalysis = useMemo(() => {
-    if (isCreatingNew) {
-      return null; // Return null to show create form
-    }
+    if (isCreatingNew) return null;
     return analyses.find((a) => a.id === selectedId) || null;
   }, [analyses, selectedId, isCreatingNew]);
+
+  // Prev / Next navigation
+  const currentIndex = useMemo(
+    () => (selectedId ? analyses.findIndex((a) => a.id === selectedId) : -1),
+    [analyses, selectedId]
+  );
+  const prevAnalysisId = currentIndex > 0 ? analyses[currentIndex - 1].id : null;
+  const nextAnalysisId = currentIndex >= 0 && currentIndex < analyses.length - 1 ? analyses[currentIndex + 1].id : null;
 
   const handleSearch = useCallback(
     (search: string) => {
@@ -110,6 +118,7 @@ export default function AnalysisPageClient({
         await deleteAnalysis(analysisToDelete);
         if (selectedId === analysisToDelete) {
           setSelectedId(null);
+          setIsCreatingNew(false);
         }
         setDeleteDialogOpen(false);
         setAnalysisToDelete(null);
@@ -124,25 +133,88 @@ export default function AnalysisPageClient({
     setSelectedId(null);
   }, []);
 
+  const showDetail = selectedId !== null || isCreatingNew;
+
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col gap-6 md:flex-row">
-      <Card className="flex-[3] flex flex-col overflow-hidden min-h-0">
-        <CardHeader className="flex-shrink-0">
-          <CardTitle>Analysis</CardTitle>
-        </CardHeader>
-        <CardContent className="flex-1 overflow-hidden min-h-0">
-          <AnalysisTable
-            data={analyses}
-            selectedId={selectedId}
-            isLoading={isLoading}
-            onSelect={handleSelect}
-            onSearchChange={handleSearch}
-            onSortChange={handleSortChange}
-            onAdd={handleAdd}
-            onDelete={handleDeleteClick}
-          />
-        </CardContent>
-      </Card>
+    <>
+      {!showDetail ? (
+        /* ─── LIST VIEW ─────────────────────────────────────────── */
+        <Card className="flex flex-col overflow-hidden" style={{ height: "calc(100vh - 8rem)" }}>
+          <CardHeader className="flex-shrink-0">
+            <CardTitle>Analysis</CardTitle>
+          </CardHeader>
+          <CardContent className="flex-1 overflow-hidden min-h-0">
+            <AnalysisTable
+              data={analyses}
+              selectedId={selectedId}
+              isLoading={isLoading}
+              onSelect={handleSelect}
+              onSearchChange={handleSearch}
+              onSortChange={handleSortChange}
+              onAdd={handleAdd}
+              onDelete={handleDeleteClick}
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        /* ─── DETAIL VIEW ────────────────────────────────────────── */
+        <div className="flex flex-col" style={{ height: "calc(100vh - 8rem)" }}>
+          {/* Breadcrumb bar */}
+          <div className="flex items-center gap-2 pb-3 mb-4 border-b flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCancel}
+              className="gap-1 pl-1 text-muted-foreground hover:text-foreground"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Analysis
+            </Button>
+            <span className="text-muted-foreground">/</span>
+            <span className="font-medium text-sm truncate">
+              {isCreatingNew
+                ? "New Analysis"
+                : `${selectedAnalysis?.code ?? ""} — ${selectedAnalysis?.name ?? ""}`}
+            </span>
+
+            {!isCreatingNew && (
+              <div className="ml-auto flex gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => prevAnalysisId && handleSelect(prevAnalysisId)}
+                  disabled={prevAnalysisId === null}
+                  aria-label="Previous analysis"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => nextAnalysisId && handleSelect(nextAnalysisId)}
+                  disabled={nextAnalysisId === null}
+                  aria-label="Next analysis"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Detail panel - fills remaining height */}
+          <div className="flex-1 min-h-0">
+            <AnalysisDetail
+              projectId={projectId}
+              analysis={selectedAnalysis}
+              isCreatingNew={isCreatingNew}
+              isSaving={isPending}
+              onSave={handleSave}
+              onCancel={handleCancel}
+              onDeleteClick={selectedAnalysis ? handleDeleteClick : undefined}
+            />
+          </div>
+        </div>
+      )}
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
@@ -163,22 +235,6 @@ export default function AnalysisPageClient({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <Card className="flex-[2] flex flex-col overflow-hidden min-h-0 md:max-h-[calc(100vh-8rem)]">
-        <CardHeader className="flex-shrink-0">
-          <CardTitle>Analysis Details</CardTitle>
-        </CardHeader>
-        <CardContent className="flex-1 overflow-y-auto min-h-0">
-          <AnalysisDetail
-            projectId={projectId}
-            analysis={selectedAnalysis}
-            isCreatingNew={isCreatingNew}
-            isSaving={isPending}
-            onSave={handleSave}
-            onCancel={handleCancel}
-          />
-        </CardContent>
-      </Card>
-    </div>
+    </>
   );
 }
