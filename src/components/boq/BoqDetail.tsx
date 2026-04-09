@@ -155,12 +155,14 @@ export default function BoqDetail({
   const quantityNum = parseFloat(quantity) || 0;
 
   return (
-    <div className="flex h-full gap-6 overflow-hidden">
-      {/* ── LEFT COLUMN: Item Info + Cost Summary + Actions ── */}
-      <div className="w-80 flex-shrink-0 flex flex-col gap-4 overflow-y-auto pb-6">
+    <div className="flex flex-col h-full">
+      {/* ── MAIN CONTENT: two columns ── */}
+      <div className="flex flex-1 gap-6 overflow-hidden min-h-0">
+      {/* ── LEFT COLUMN: Item Info + Cost Summary ── */}
+      <div className="w-80 flex-shrink-0 flex flex-col gap-4 overflow-y-auto pb-4">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">BoQ Item Info</CardTitle>
+            <CardTitle className="text-sm uppercase tracking-wider text-muted-foreground">BoQ Item Info</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-1.5">
@@ -219,30 +221,22 @@ export default function BoqDetail({
 
         <BoqCostSummary quantity={quantityNum} analyses={analysesForCost} />
 
-        {/* Action buttons */}
-        <div className="flex flex-col gap-2 pt-2 border-t">
-          <Button onClick={handleSubmit} disabled={isSaving} className="w-full">
-            {isSaving ? "Saving…" : boqItem ? "Update BoQ Item" : "Create BoQ Item"}
+        {/* Delete button (secondary action) */}
+        {boqItem && onDeleteClick && (
+          <Button
+            variant="outline"
+            onClick={() => onDeleteClick(boqItem.id)}
+            disabled={isSaving}
+            className="w-full text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete BoQ Item
           </Button>
-          <Button variant="outline" onClick={onCancel} disabled={isSaving} className="w-full">
-            Cancel
-          </Button>
-          {boqItem && onDeleteClick && (
-            <Button
-              variant="destructive"
-              onClick={() => onDeleteClick(boqItem.id)}
-              disabled={isSaving}
-              className="w-full mt-2"
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete BoQ Item
-            </Button>
-          )}
-        </div>
+        )}
       </div>
 
       {/* ── RIGHT COLUMN: Analyses Linked ── */}
-      <div className="flex-1 min-w-0 overflow-y-auto pb-6">
+      <div className="flex-1 min-w-0 overflow-y-auto pb-4">
         <Card className="h-fit">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -340,6 +334,8 @@ export default function BoqDetail({
         </Card>
       </div>
 
+      </div>{/* end two-column row */}
+
       <BoqAnalysisPicker
         open={pickerOpen}
         onOpenChange={setPickerOpen}
@@ -347,6 +343,21 @@ export default function BoqDetail({
         existingAnalysisIds={existingAnalysisIds}
         onSelect={handleSelectAnalysis}
       />
+
+      {/* ── STICKY FOOTER: primary actions ── */}
+      <div className="flex-shrink-0 border-t bg-card px-0 pt-3 pb-1 flex items-center justify-between gap-4">
+        <span className="text-xs text-muted-foreground">
+          Changes are saved only when you click &quot;{boqItem ? "Update BoQ Item" : "Create BoQ Item"}&quot;
+        </span>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onCancel} disabled={isSaving}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={isSaving}>
+            {isSaving ? "Saving…" : boqItem ? "Update BoQ Item" : "Create BoQ Item"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

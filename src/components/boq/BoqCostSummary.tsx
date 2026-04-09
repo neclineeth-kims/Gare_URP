@@ -37,77 +37,59 @@ function computeBoqCostsClient(quantity: number, analyses: AnalysisRow[]) {
   };
 }
 
-export default function BoqCostSummary({ quantity, analyses }: BoqCostSummaryProps) {
-  const costs = useMemo(
-    () => computeBoqCostsClient(quantity, analyses),
-    [quantity, analyses]
+function fmt(n: number) {
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function LineItem({
+  label,
+  value,
+  color,
+  bold,
+  separator,
+}: {
+  label: string;
+  value: number;
+  color?: string;
+  bold?: boolean;
+  separator?: boolean;
+}) {
+  return (
+    <div className={`flex items-center justify-between py-1.5 ${separator ? "border-t mt-1 pt-2.5" : ""}`}>
+      <span className={`text-sm ${bold ? "font-semibold" : "text-muted-foreground"}`}>{label}</span>
+      <span className={`font-mono text-sm ${bold ? "font-bold" : ""} ${color ?? "text-foreground"}`}>
+        {value === 0 && !bold ? "—" : fmt(value)}
+      </span>
+    </div>
   );
+}
+
+export default function BoqCostSummary({ quantity, analyses }: BoqCostSummaryProps) {
+  const c = useMemo(() => computeBoqCostsClient(quantity, analyses), [quantity, analyses]);
 
   return (
-    <Card className="bg-gradient-to-br from-card to-muted/20">
-      <CardHeader>
-        <CardTitle className="text-lg">Cost Summary</CardTitle>
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm uppercase tracking-wider text-muted-foreground">Cost Summary</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-4">
-            <div className="mb-1 text-sm font-medium text-muted-foreground">
-              Unit Rate DC (BDC)
-            </div>
-            <div className="text-2xl font-bold font-mono text-green-600 dark:text-green-400">
-              {costs.unitRateDC.toFixed(3)}
-            </div>
+      <CardContent className="pt-0">
+        <LineItem label="Total DC" value={c.totalDC} color="text-green-500" bold />
+        <LineItem label="Total DP" value={c.totalDP} color="text-amber-500" bold />
+        <LineItem label="Grand Total TC" value={c.totalTC} color="text-foreground" bold separator />
+
+        {/* Unit Rates */}
+        <div className="mt-3 pt-3 border-t grid grid-cols-3 gap-2 text-center">
+          <div>
+            <div className="text-[10px] text-muted-foreground leading-tight">UR DC</div>
+            <div className="font-mono text-sm font-semibold text-green-500">{c.unitRateDC.toFixed(3)}</div>
           </div>
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-            <div className="mb-1 text-sm font-medium text-muted-foreground">
-              Unit Rate DP (BDP)
-            </div>
-            <div className="text-2xl font-bold font-mono text-amber-600 dark:text-amber-400">
-              {costs.unitRateDP.toFixed(3)}
-            </div>
+          <div>
+            <div className="text-[10px] text-muted-foreground leading-tight">UR DP</div>
+            <div className="font-mono text-sm font-semibold text-amber-500">{c.unitRateDP.toFixed(3)}</div>
           </div>
-          <div className="rounded-lg border-2 border-primary bg-primary/5 p-4">
-            <div className="mb-1 text-sm font-medium text-muted-foreground">
-              Unit Rate TC (BTC)
-            </div>
-            <div className="text-2xl font-bold font-mono text-primary">
-              {costs.unitRateTC.toFixed(3)}
-            </div>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 gap-4 border-t pt-4 md:grid-cols-3">
-          <div className="text-center">
-            <div className="mb-1 text-sm font-medium text-muted-foreground">
-              Total DC
-            </div>
-            <div className="text-xl font-bold font-mono text-green-600 dark:text-green-400">
-              {costs.totalDC.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="mb-1 text-sm font-medium text-muted-foreground">
-              Total DP
-            </div>
-            <div className="text-xl font-bold font-mono text-amber-600 dark:text-amber-400">
-              {costs.totalDP.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="mb-1 text-sm font-medium text-muted-foreground">
-              Total TC
-            </div>
-            <div className="text-xl font-bold font-mono text-primary">
-              {costs.totalTC.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </div>
+          <div>
+            <div className="text-[10px] text-muted-foreground leading-tight">UR TC</div>
+            <div className="font-mono text-sm font-semibold">{c.unitRateTC.toFixed(3)}</div>
           </div>
         </div>
       </CardContent>

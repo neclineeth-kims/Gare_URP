@@ -24,61 +24,48 @@ type AnalysisCostSummaryProps = {
   resources: ResourceRow[];
 };
 
-// Client-safe calculation function (doesn't use Prisma Decimal)
-function computeAnalysisCostsClient(
-  baseQuantity: number,
-  resources: ResourceRow[]
-): {
-  directCost: number;
-  depreciation: number;
-  totalCost: number;
-  unitRateDC: number;
-  unitRateDP: number;
-  unitRateTC: number;
-} {
-  let directCost = 0;
-  let depreciation = 0;
+function computeAnalysisCostsClient(baseQuantity: number, resources: ResourceRow[]) {
+  let laborCost = 0;
+  let materialCost = 0;
+  let equipmentEDC = 0;
+  let equipmentEDP = 0;
 
   for (const res of resources) {
     switch (res.resourceType) {
       case "labor":
-        if (res.labor?.rate) {
-          directCost += res.quantity * res.labor.rate;
-        }
+        if (res.labor?.rate) laborCost += res.quantity * res.labor.rate;
         break;
       case "material":
-        if (res.material?.rate) {
-          directCost += res.quantity * res.material.rate;
-        }
+        if (res.material?.rate) materialCost += res.quantity * res.material.rate;
         break;
       case "equipment":
         if (res.equipment) {
-          // Calculate equipment EDC from sub-resources
           let edc = 0;
           for (const sr of res.equipment.subResources) {
-            if (sr.labor?.rate) {
-              edc += sr.quantity * sr.labor.rate;
-            }
-            if (sr.material?.rate) {
-              edc += sr.quantity * sr.material.rate;
-            }
+            if (sr.labor?.rate) edc += sr.quantity * sr.labor.rate;
+            if (sr.material?.rate) edc += sr.quantity * sr.material.rate;
           }
-          // Calculate equipment EDP
-          const edp = res.equipment.depreciationTotal > 0
-            ? res.equipment.totalValue / res.equipment.depreciationTotal
-            : 0;
-          
-          const qty = res.quantity;
-          directCost += qty * edc;
-          depreciation += qty * edp;
+          const edp =
+            res.equipment.depreciationTotal > 0
+              ? res.equipment.totalValue / res.equipment.depreciationTotal
+              : 0;
+          equipmentEDC += res.quantity * edc;
+          equipmentEDP += res.quantity * edp;
         }
         break;
     }
   }
 
+  const directCost = laborCost + materialCost + equipmentEDC;
+  const depreciation = equipmentEDP;
   const totalCost = directCost + depreciation;
   const base = baseQuantity || 1;
+
   return {
+    laborCost,
+    materialCost,
+    equipmentEDC,
+    equipmentEDP,
     directCost,
     depreciation,
     totalCost,
@@ -88,70 +75,66 @@ function computeAnalysisCostsClient(
   };
 }
 
-export default function AnalysisCostSummary({
-  baseQuantity,
-  resources,
-}: AnalysisCostSummaryProps) {
-  const costs = useMemo(() => {
-    return computeAnalysisCostsClient(baseQuantity, resources);
-  }, [baseQuantity, resources]);
+function fmt(n: number) {
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function LineItem({
+  label,
+  value,
+  color,
+  bold,
+  separator,
+}: {
+  label: string;
+  value: number;
+  color?: string;
+  bold?: boolean;
+  separator?: boolean;
+}) {
+  const valueClass = color ?? "text-foreground";
+  return (
+    <div className={`flex items-center justify-between py-1.5 ${separator ? "border-t mt-1 pt-2.5" : ""}`}>
+      <span className={`text-sm ${bold ? "font-semibold" : "text-muted-foreground"}`}>{label}</span>
+      <span className={`font-mono text-sm ${bold ? "font-bold text-base" : ""} ${valueClass}`}>
+        {value === 0 && !bold ? "—" : fmt(value)}
+      </span>
+    </div>
+  );
+}
+
+export default function AnalysisCostSummary({ baseQuantity, resources }: AnalysisCostSummaryProps) {
+  const c = useMemo(() => computeAnalysisCostsClient(baseQuantity, resources), [baseQuantity, resources]);
 
   return (
-    <Card className="bg-gradient-to-br from-card to-muted/20">
-      <CardHeader>
-        <CardTitle className="text-lg">Cost Summary</CardTitle>
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm uppercase tracking-wider text-muted-foreground">Cost Summary</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          <div className="rounded-lg border bg-background/50 p-4">
-            <div className="text-sm font-medium text-muted-foreground mb-1">Direct Cost (ADC)</div>
-            <div className="text-2xl font-bold font-mono text-green-600 dark:text-green-400">
-              {costs.directCost.toFixed(2)}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">total</div>
-            <div className="text-xs text-muted-foreground mt-2">
-              Labor + Material + Equipment EDC
-            </div>
+      <CardContent className="pt-0">
+        <LineItem label="Labor Cost" value={c.laborCost} color="text-green-500" />
+        <LineItem label="Material Cost" value={c.materialCost} color="text-green-500" />
+        <LineItem label="Equipment EDC" value={c.equipmentEDC} color="text-green-500" />
+        <LineItem label="Direct Cost (ADC)" value={c.directCost} color="text-green-500" bold separator />
+
+        <LineItem label="Equipment EDP" value={c.equipmentEDP} color="text-amber-500" />
+        <LineItem label="Depreciation (ADP)" value={c.depreciation} color="text-amber-500" bold separator />
+
+        <LineItem label="Grand Total (ATC)" value={c.totalCost} color="text-foreground" bold separator />
+
+        {/* Unit Rates */}
+        <div className="mt-3 pt-3 border-t grid grid-cols-3 gap-2 text-center">
+          <div>
+            <div className="text-[10px] text-muted-foreground leading-tight">UR DC / cum</div>
+            <div className="font-mono text-sm font-semibold text-green-500">{c.unitRateDC.toFixed(3)}</div>
           </div>
-          <div className="rounded-lg border bg-background/50 p-4">
-            <div className="text-sm font-medium text-muted-foreground mb-1">Depreciation (ADP)</div>
-            <div className="text-2xl font-bold font-mono text-amber-600 dark:text-amber-400">
-              {costs.depreciation.toFixed(2)}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">total</div>
-            <div className="text-xs text-muted-foreground mt-2">
-              Equipment depreciation
-            </div>
+          <div>
+            <div className="text-[10px] text-muted-foreground leading-tight">UR DP / cum</div>
+            <div className="font-mono text-sm font-semibold text-amber-500">{c.unitRateDP.toFixed(3)}</div>
           </div>
-          <div className="rounded-lg border-2 border-primary bg-primary/5 p-4">
-            <div className="text-sm font-medium text-muted-foreground mb-1">Total Cost (ATC)</div>
-            <div className="text-2xl font-bold font-mono text-primary">
-              {costs.totalCost.toFixed(2)}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">total</div>
-            <div className="text-xs text-muted-foreground mt-2">
-              ADC + ADP
-            </div>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
-          <div className="text-center">
-            <div className="text-sm font-medium text-muted-foreground mb-1">Unit Rate DC</div>
-            <div className="text-xl font-bold font-mono">
-              {costs.unitRateDC.toFixed(3)}
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-sm font-medium text-muted-foreground mb-1">Unit Rate DP</div>
-            <div className="text-xl font-bold font-mono">
-              {costs.unitRateDP.toFixed(3)}
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-sm font-medium text-muted-foreground mb-1">Unit Rate TC</div>
-            <div className="text-xl font-bold font-mono text-primary">
-              {costs.unitRateTC.toFixed(3)}
-            </div>
+          <div>
+            <div className="text-[10px] text-muted-foreground leading-tight">UR TC / cum</div>
+            <div className="font-mono text-sm font-semibold">{c.unitRateTC.toFixed(3)}</div>
           </div>
         </div>
       </CardContent>

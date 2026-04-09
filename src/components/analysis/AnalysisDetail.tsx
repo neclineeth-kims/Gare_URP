@@ -297,52 +297,55 @@ export default function AnalysisDetail({
   ];
 
   return (
-    <div className="flex h-full gap-6 overflow-hidden">
-      {/* ── LEFT COLUMN: Info + Cost Summary + Actions ── */}
-      <div className="w-80 flex-shrink-0 flex flex-col gap-4 overflow-y-auto pb-6">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Analysis Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="code">Code *</Label>
-              <Input
-                ref={codeInputRef}
-                id="code"
-                value={code}
-                onChange={(e) => { setCode(e.target.value); if (errors.code) setErrors((p) => ({ ...p, code: undefined })); }}
-                placeholder="AN001"
-                maxLength={6}
-                className={errors.code ? "border-destructive" : ""}
-              />
-              {errors.code && <p className="text-xs text-destructive">{errors.code}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="name">Name *</Label>
-              <Input
-                id="name"
-                value={name}
-                onChange={(e) => { setName(e.target.value); if (errors.name) setErrors((p) => ({ ...p, name: undefined })); }}
-                placeholder="Analysis Name"
-                className={errors.name ? "border-destructive" : ""}
-              />
-              {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="unit">Unit *</Label>
-                <Input
-                  id="unit"
-                  value={unit}
-                  onChange={(e) => { setUnit(e.target.value); if (errors.unit) setErrors((p) => ({ ...p, unit: undefined })); }}
-                  placeholder="cum"
-                  className={errors.unit ? "border-destructive" : ""}
-                />
-                {errors.unit && <p className="text-xs text-destructive">{errors.unit}</p>}
+    <div className="flex flex-col h-full">
+      {/* ── MAIN CONTENT: two columns ── */}
+      <div className="flex flex-1 gap-6 overflow-hidden min-h-0">
+        {/* ── LEFT COLUMN: Info + Cost Summary ── */}
+        <div className="w-80 flex-shrink-0 flex flex-col gap-4 overflow-y-auto pb-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm uppercase tracking-wider text-muted-foreground">Analysis Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="code">Code *</Label>
+                  <Input
+                    ref={codeInputRef}
+                    id="code"
+                    value={code}
+                    onChange={(e) => { setCode(e.target.value); if (errors.code) setErrors((p) => ({ ...p, code: undefined })); }}
+                    placeholder="AN001"
+                    maxLength={6}
+                    className={errors.code ? "border-destructive" : ""}
+                  />
+                  {errors.code && <p className="text-xs text-destructive">{errors.code}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="unit">Unit *</Label>
+                  <Input
+                    id="unit"
+                    value={unit}
+                    onChange={(e) => { setUnit(e.target.value); if (errors.unit) setErrors((p) => ({ ...p, unit: undefined })); }}
+                    placeholder="cum"
+                    className={errors.unit ? "border-destructive" : ""}
+                  />
+                  {errors.unit && <p className="text-xs text-destructive">{errors.unit}</p>}
+                </div>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="baseQuantity">Base Qty *</Label>
+                <Label htmlFor="name">Name *</Label>
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => { setName(e.target.value); if (errors.name) setErrors((p) => ({ ...p, name: undefined })); }}
+                  placeholder="Analysis Name"
+                  className={errors.name ? "border-destructive" : ""}
+                />
+                {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="baseQuantity">Base Quantity *</Label>
                 <Input
                   id="baseQuantity"
                   type="number"
@@ -355,35 +358,24 @@ export default function AnalysisDetail({
                 />
                 {errors.baseQuantity && <p className="text-xs text-destructive">{errors.baseQuantity}</p>}
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <AnalysisCostSummary baseQuantity={baseQuantityNum} resources={allResourcesForCost} />
+          <AnalysisCostSummary baseQuantity={baseQuantityNum} resources={allResourcesForCost} />
 
-        {/* Action buttons */}
-        <div className="flex flex-col gap-2 pt-2 border-t">
-          <Button onClick={handleSave} disabled={isSaving} className="w-full">
-            {isSaving ? (
-              <><svg className="mr-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>Saving...</>
-            ) : analysis ? "Update Analysis" : "Create Analysis"}
-          </Button>
-          <Button variant="outline" onClick={onCancel} disabled={isSaving} className="w-full">
-            Cancel
-          </Button>
+          {/* Delete button in left column (secondary action) */}
           {analysis && onDeleteClick && (
             <Button
-              variant="destructive"
+              variant="outline"
               onClick={() => onDeleteClick(analysis.id)}
               disabled={isSaving}
-              className="w-full mt-2"
+              className="w-full text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
             >
               <Trash2 className="mr-2 h-4 w-4" />
               Delete Analysis
             </Button>
           )}
         </div>
-      </div>
 
       {/* ── RIGHT COLUMN: Resource Tables ── */}
       <div className="flex-1 min-w-0 flex flex-col gap-4 overflow-y-auto pb-6">
@@ -450,6 +442,7 @@ export default function AnalysisDetail({
           </CardContent>
         </Card>
       </div>
+      </div>{/* end two-column row */}
 
       <AnalysisResourcePicker
         open={pickerOpen}
@@ -462,6 +455,23 @@ export default function AnalysisDetail({
         onSelectMaterial={handleSelectMaterial}
         onSelectEquipment={handleSelectEquipment}
       />
+
+      {/* ── STICKY FOOTER: primary actions ── */}
+      <div className="flex-shrink-0 border-t bg-card px-0 pt-3 pb-1 flex items-center justify-between gap-4">
+        <span className="text-xs text-muted-foreground">
+          Changes are saved only when you click &quot;{analysis ? "Update Analysis" : "Create Analysis"}&quot;
+        </span>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onCancel} disabled={isSaving}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? (
+              <><svg className="mr-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>Saving...</>
+            ) : analysis ? "Update Analysis" : "Create Analysis"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
