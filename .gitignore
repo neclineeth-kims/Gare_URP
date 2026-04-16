@@ -44,3 +44,10 @@ dev.db
 
 # project data (template and user projects)
 /data/
+
+# electron compiled output and packaged distributables
+/electron/dist/
+/dist-electron/
+
+# electron assets (icons - generated separately)
+!/electron/assets/.gitkeep

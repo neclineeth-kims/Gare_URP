@@ -1,0 +1,64 @@
+# electron-builder configuration for Unit Rate App
+# Build with: npm run electron:build:linux  (or :win)
+
+appId: com.unitrate.app
+productName: Unit Rate App
+
+directories:
+  output: dist-electron        # packaged output goes here
+  buildResources: electron/assets
+
+# ── Main entry point (compiled from electron/main.ts) ────────────────────────
+main: electron/dist/main.js
+
+# ── Files to include in the package ─────────────────────────────────────────
+files:
+  - "**/*"
+  # Exclude secrets and dev-only files
+  - "!.env*"
+  - "!**/.env*"
+  # Exclude dev databases and seeds
+  - "!prisma/desktop.db"
+  - "!prisma/seed*.ts"
+  - "!prisma/migrations/**"
+  # Exclude unnecessary large directories
+  - "!**/node_modules/.cache/**"
+  - "!**/scripts/**"
+  - "!**/*.md"
+  - "!dist-electron/**"
+  - "!electron/assets/**"
+
+# ── Unpack native modules from ASAR so they can be loaded ────────────────────
+# Prisma's query engine is a pre-compiled native .node binary and must NOT
+# be inside the ASAR archive — it needs to be a real file on disk.
+asarUnpack:
+  - "node_modules/.prisma/**"
+  - "node_modules/@prisma/engines/**"
+  - "node_modules/prisma/**"
+
+# ── Linux build ───────────────────────────────────────────────────────────────
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  category: Office
+  description: "Offline unit rate analysis for construction cost engineering"
+  icon: electron/assets/icon.png  # 512×512 PNG (create before building)
+
+# ── Windows build ─────────────────────────────────────────────────────────────
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: electron/assets/icon.ico  # 256×256 ICO (create before building)
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: electron/assets/icon.ico
+  uninstallerIcon: electron/assets/icon.ico
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+# ── Extra metadata ────────────────────────────────────────────────────────────
+copyright: "Copyright © 2026"

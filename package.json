@@ -2,6 +2,7 @@
   "name": "unit-rate-app",
   "version": "0.1.0",
   "private": true,
+  "main": "electron/dist/main.js",
   "scripts": {
     "postinstall": "prisma generate",
     "dev": "next dev",
@@ -21,7 +22,12 @@
     "desktop:seed": "dotenv -e .env.desktop -- npx tsx prisma/seed-desktop.ts",
     "desktop:setup": "npm run desktop:generate && npm run desktop:push && npm run desktop:seed",
     "desktop:dev": "npm run desktop:generate && dotenv -e .env.desktop -- next dev",
-    "desktop:build": "npm run desktop:generate && dotenv -e .env.desktop -- next build"
+    "desktop:build": "npm run desktop:generate && dotenv -e .env.desktop -- next build",
+    "electron:compile": "tsc --project tsconfig.electron.json",
+    "electron:dev": "npm run desktop:setup && concurrently --kill-others \"dotenv -e .env.desktop -- next dev -p 3700\" \"wait-on http://localhost:3700 && electron electron/dist/main.js\"",
+    "electron:build:linux": "npm run electron:compile && ELECTRON_BUILD=1 npm run desktop:build && electron-builder --linux",
+    "electron:build:win": "npm run electron:compile && ELECTRON_BUILD=1 npm run desktop:build && electron-builder --win",
+    "electron:build": "npm run electron:compile && ELECTRON_BUILD=1 npm run desktop:build && electron-builder"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
@@ -57,6 +63,7 @@
     "@types/react-dom": "^18",
     "better-sqlite3": "^12.6.2",
     "dotenv-cli": "^11.0.0",
+    "electron": "^41.2.1",
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
     "postcss": "^8",
