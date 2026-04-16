@@ -8,6 +8,11 @@ directories:
   output: dist-electron        # packaged output goes here
   buildResources: electron/assets
 
+# Bundle the pre-seeded SQLite template so first-launch works offline
+extraResources:
+  - from: electron/assets/template.db
+    to: template.db
+
 # ── Files to include in the package ─────────────────────────────────────────
 files:
   - "**/*"
@@ -48,6 +53,8 @@ win:
     - target: nsis
       arch: [x64]
   icon: electron/assets/icon.ico  # 256×256 ICO (create before building)
+  signingHashAlgorithms: []
+  sign: null
 
 nsis:
   oneClick: false

@@ -51,3 +51,4 @@ dev.db
 
 # electron assets (icons - generated separately)
 !/electron/assets/.gitkeep
+!electron/assets/template.db

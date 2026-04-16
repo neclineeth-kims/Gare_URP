@@ -53,7 +53,21 @@ function getDbPath(): string {
   if (!fs.existsSync(userDataPath)) {
     fs.mkdirSync(userDataPath, { recursive: true });
   }
-  return path.join(userDataPath, "unitrate.db").replace(/\\/g, "/");
+  const dbPath = path.join(userDataPath, "unitrate.db");
+  // On first launch the database won't exist yet — copy the bundled template
+  // (which has the schema + base currency seed already applied).
+  if (!fs.existsSync(dbPath)) {
+    const templatePath = isDev
+      ? path.join(__dirname, "../../electron/assets/template.db")
+      : path.join(eProcess.resourcesPath, "template.db");
+    if (fs.existsSync(templatePath)) {
+      fs.copyFileSync(templatePath, dbPath);
+      console.log("[electron] First launch: copied template.db →", dbPath);
+    } else {
+      console.warn("[electron] template.db not found at", templatePath);
+    }
+  }
+  return dbPath.replace(/\\/g, "/");
 }
 
 // ── Prisma engine path (production only) ─────────────────────────────────────
