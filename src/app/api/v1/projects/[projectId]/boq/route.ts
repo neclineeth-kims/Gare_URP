@@ -95,11 +95,31 @@ export async function POST(
       );
     }
 
+    const qty = Number(quantity);
+    if (isNaN(qty) || qty <= 0) {
+      return NextResponse.json(
+        { error: "Quantity must be a positive number" },
+        { status: 400 }
+      );
+    }
+
+    if (Array.isArray(analyses) && analyses.length > 0) {
+      for (const a of analyses) {
+        const coeff = Number(a.coefficient);
+        if (isNaN(coeff) || coeff <= 0) {
+          return NextResponse.json(
+            { error: "Coefficient must be a positive number" },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     const input: CreateBoqItemInput = {
       code: String(code).trim(),
       name: String(name).trim(),
       unit: String(unit).trim(),
-      quantity: Number(quantity),
+      quantity: qty,
     };
 
     if (Array.isArray(analyses) && analyses.length > 0) {
@@ -154,9 +174,14 @@ export async function POST(
     });
   } catch (e) {
     console.error(e);
-    const message = e instanceof Error ? e.message : "Failed to create BoQ item";
+    const raw = e instanceof Error ? e.message : "Failed to create BoQ item";
+    const message = raw.includes("Unique constraint")
+      ? "A BoQ item with this code already exists in the project"
+      : raw.includes("not found") || raw.includes("does not belong")
+      ? raw
+      : "Failed to create BoQ item";
     const status =
-      message.includes("not found") || message.includes("does not belong")
+      raw.includes("not found") || raw.includes("does not belong") || raw.includes("Unique constraint")
         ? 400
         : 500;
     return NextResponse.json({ error: message }, { status });

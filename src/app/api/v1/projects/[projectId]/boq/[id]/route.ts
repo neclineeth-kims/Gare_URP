@@ -97,8 +97,26 @@ export async function PUT(
     if (code != null) input.code = String(code).trim();
     if (name != null) input.name = String(name).trim();
     if (unit != null) input.unit = String(unit).trim();
-    if (quantity != null) input.quantity = Number(quantity);
+    if (quantity != null) {
+      const qty = Number(quantity);
+      if (isNaN(qty) || qty <= 0) {
+        return NextResponse.json(
+          { error: "Quantity must be a positive number" },
+          { status: 400 }
+        );
+      }
+      input.quantity = qty;
+    }
     if (Array.isArray(analyses)) {
+      for (const a of analyses) {
+        const coeff = Number(a.coefficient);
+        if (isNaN(coeff) || coeff <= 0) {
+          return NextResponse.json(
+            { error: "Coefficient must be a positive number" },
+            { status: 400 }
+          );
+        }
+      }
       input.analyses = analyses.map(
         (a: { analysisId: string; coefficient: number }) => ({
           analysisId: String(a.analysisId),
@@ -152,9 +170,12 @@ export async function PUT(
     });
   } catch (e) {
     console.error(e);
-    const message = e instanceof Error ? e.message : "Failed to update BoQ item";
+    const raw = e instanceof Error ? e.message : "Failed to update BoQ item";
+    const message = raw.includes("Unique constraint")
+      ? "A BoQ item with this code already exists in the project"
+      : raw;
     const status =
-      message.includes("not found") || message.includes("does not belong")
+      raw.includes("not found") || raw.includes("does not belong") || raw.includes("Unique constraint")
         ? 400
         : 500;
     return NextResponse.json({ error: message }, { status });
