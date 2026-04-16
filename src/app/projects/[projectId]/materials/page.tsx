@@ -29,6 +29,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Plus, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 type Material = {
@@ -53,6 +63,7 @@ export default function MaterialsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ code: "", name: "", unit: "lt", rate: "", currencySlot: 1 });
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const fetchCurrencies = async () => {
     const res = await fetch(`/api/v1/projects/${projectId}/currencies`);
@@ -132,11 +143,12 @@ export default function MaterialsPage() {
     setDialogOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this material?")) return;
-    const res = await fetch(`/api/v1/projects/${projectId}/materials/${id}`, {
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    const res = await fetch(`/api/v1/projects/${projectId}/materials/${deleteId}`, {
       method: "DELETE",
     });
+    setDeleteId(null);
     if (res.ok) {
       toast.success("Material deleted");
       fetchMaterials();
@@ -299,7 +311,7 @@ export default function MaterialsPage() {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-destructive"
-                          onClick={() => handleDelete(item.id)}
+                          onClick={() => setDeleteId(item.id)}
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete
@@ -314,6 +326,26 @@ export default function MaterialsPage() {
           </Table>
         </div>
       )}
+
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Material?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the material. Any analysis resources referencing it will also be removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDelete}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
