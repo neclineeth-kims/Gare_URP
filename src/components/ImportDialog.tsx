@@ -84,7 +84,7 @@ export function ImportDialog<T extends { code: string; _error?: string }>({
       }
       const validated = validate(raw);
 
-      let existingMap: Record<string, string> = {};
+      const existingMap: Record<string, string> = {};
       if (fetchExisting) {
         const existing = await fetchExisting();
         existing.forEach(({ code, id }) => {

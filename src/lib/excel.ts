@@ -36,7 +36,7 @@ export function parseExcelFile(file: File): Promise<ImportRow[]> {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json<ImportRow>(ws, { defval: "" });
         resolve(rows);
-      } catch (err) {
+      } catch {
         reject(new Error("Failed to read file. Make sure it is a valid .xlsx or .csv file."));
       }
     };
@@ -252,7 +252,7 @@ export function parseEquipmentFile(file: File): Promise<EquipmentImportData> {
           return;
         }
         resolve({ equipment, subResources });
-      } catch (err) {
+      } catch {
         reject(new Error("Failed to read file. Make sure it is a valid .xlsx or .csv file."));
       }
     };
