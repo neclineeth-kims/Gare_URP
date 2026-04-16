@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useEquipmentManager } from "@/hooks/useEquipmentManager";
 import EquipmentTable from "./EquipmentTable";
 import EquipmentDetail from "./EquipmentDetail";
+import { EquipmentImportDialog } from "./EquipmentImportDialog";
 import type { EquipmentWithCostsClient } from "@/types/equipment";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -16,6 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { exportEquipment, downloadEquipmentTemplate } from "@/lib/excel";
 
 type EquipmentPageClientProps = {
   projectId: string;
@@ -122,6 +124,10 @@ export default function EquipmentPageClient({
     setSelectedId(null);
   }, []);
 
+  const handleExport = useCallback(() => {
+    exportEquipment(equipment);
+  }, [equipment]);
+
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col gap-6 md:flex-row">
       <Card className="flex-[3] flex flex-col overflow-hidden min-h-0">
@@ -138,6 +144,14 @@ export default function EquipmentPageClient({
             onSortChange={handleSortChange}
             onAdd={handleAdd}
             onDelete={handleDeleteClick}
+            onExport={handleExport}
+            importSlot={
+              <EquipmentImportDialog
+                projectId={projectId}
+                onDone={() => fetchEquipment(searchTerm || undefined, sortBy)}
+                onDownloadTemplate={downloadEquipmentTemplate}
+              />
+            }
           />
         </CardContent>
       </Card>

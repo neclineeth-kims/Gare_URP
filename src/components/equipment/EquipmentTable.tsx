@@ -18,7 +18,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, MoreHorizontal, Pencil, Trash2, Search, Loader2 } from "lucide-react";
+import { Plus, MoreHorizontal, Pencil, Trash2, Search, Loader2, Download } from "lucide-react";
+import type { ReactNode } from "react";
 import type { EquipmentWithCostsClient } from "@/types/equipment";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +32,9 @@ type EquipmentTableProps = {
   onSortChange: (sort: "code" | "name") => void;
   onAdd: () => void;
   onDelete: (id: string) => void;
+  /** Rendered as-is next to "Add Equipment" — pass <EquipmentImportDialog /> */
+  importSlot?: ReactNode;
+  onExport?: () => void;
 };
 
 export default function EquipmentTable({
@@ -42,6 +46,8 @@ export default function EquipmentTable({
   onSortChange,
   onAdd,
   onDelete,
+  importSlot,
+  onExport,
 }: EquipmentTableProps) {
   const [searchInput, setSearchInput] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -104,6 +110,13 @@ export default function EquipmentTable({
           >
             Sort by Name
           </Button>
+          {onExport && data.length > 0 && (
+            <Button variant="outline" size="sm" onClick={onExport} title="Export equipment to Excel">
+              <Download className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+          )}
+          {importSlot}
           <Button onClick={onAdd} aria-label="Add new equipment">
             <Plus className="mr-2 h-4 w-4" />
             Add Equipment

@@ -166,6 +166,165 @@ export function downloadMaterialTemplate() {
   saveWorkbook(wb, "materials_template.xlsx");
 }
 
+// ── Equipment import types ────────────────────────────────────────────────────
+
+export type EquipmentSheetRow = {
+  code: string;
+  name: string;
+  unit: string;
+  totalValue: number;
+  depreciationTotal: number;
+  _error?: string;
+};
+
+export type SubResourceSheetRow = {
+  equipmentCode: string;
+  resourceType: "labor" | "material";
+  resourceCode: string;
+  quantity: number;
+  _error?: string;
+};
+
+export type EquipmentImportData = {
+  equipment: EquipmentSheetRow[];
+  subResources: SubResourceSheetRow[];
+};
+
+// ── Parse equipment 2-sheet file ──────────────────────────────────────────────
+
+export function parseEquipmentFile(file: File): Promise<EquipmentImportData> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(e.target?.result, { type: "binary" });
+
+        // Sheet 1: Equipment
+        const eqSheet = wb.Sheets[wb.SheetNames[0]];
+        const eqRaw = XLSX.utils.sheet_to_json<ImportRow>(eqSheet, { defval: "" });
+        const equipment: EquipmentSheetRow[] = eqRaw.map((raw) => {
+          const r = normalise(raw);
+          const code = str(r.code || r["equipment_code"] || r["eq_code"]).toUpperCase().slice(0, 10);
+          const name = str(r.name || r["description"] || r["equipment_name"]);
+          const unit = str(r.unit || r["uom"]) || "hr";
+          const totalValue = num(r.total_value || r["totalvalue"] || r["value"]);
+          const depreciationTotal = num(r.depreciation_total || r["depreciation"] || r["depr_total"] || r["depr"]);
+
+          const errors: string[] = [];
+          if (!code) errors.push("Code required");
+          if (!name) errors.push("Name required");
+          if (isNaN(totalValue) || totalValue < 0) errors.push("Total Value must be ≥ 0");
+          if (isNaN(depreciationTotal) || depreciationTotal < 0) errors.push("Depreciation Total must be ≥ 0");
+
+          return { code, name, unit, totalValue, depreciationTotal, _error: errors.join("; ") || undefined };
+        });
+
+        // Sheet 2: Sub-Resources (optional — may be absent)
+        let subResources: SubResourceSheetRow[] = [];
+        if (wb.SheetNames.length >= 2) {
+          const srSheet = wb.Sheets[wb.SheetNames[1]];
+          const srRaw = XLSX.utils.sheet_to_json<ImportRow>(srSheet, { defval: "" });
+          subResources = srRaw.map((raw) => {
+            const r = normalise(raw);
+            const equipmentCode = str(r.equipment_code || r["eq_code"] || r["equipmentcode"]).toUpperCase();
+            const rawType = str(r.type || r["resource_type"] || r["resourcetype"]).toLowerCase();
+            const resourceCode = str(r.resource_code || r["resourcecode"] || r["code"]).toUpperCase();
+            const quantity = num(r.quantity || r["qty"]);
+
+            const errors: string[] = [];
+            if (!equipmentCode) errors.push("Equipment Code required");
+            if (rawType !== "labor" && rawType !== "material") errors.push('Type must be "labor" or "material"');
+            if (!resourceCode) errors.push("Resource Code required");
+            if (isNaN(quantity) || quantity <= 0) errors.push("Quantity must be > 0");
+
+            return {
+              equipmentCode,
+              resourceType: rawType === "labor" ? "labor" : "material",
+              resourceCode,
+              quantity,
+              _error: errors.join("; ") || undefined,
+            };
+          });
+        }
+
+        if (equipment.length === 0) {
+          reject(new Error("No equipment rows found in Sheet 1."));
+          return;
+        }
+        resolve({ equipment, subResources });
+      } catch (err) {
+        reject(new Error("Failed to read file. Make sure it is a valid .xlsx or .csv file."));
+      }
+    };
+    reader.onerror = () => reject(new Error("Failed to read file."));
+    reader.readAsBinaryString(file);
+  });
+}
+
+// ── Export: Equipment list (2-sheet) ──────────────────────────────────────────
+
+type EquipmentExportRow = {
+  id: string;
+  code: string;
+  name: string;
+  unit: string;
+  totalValue: number;
+  depreciationTotal: number;
+  subResources: Array<{
+    resourceType: string;
+    quantity: number;
+    labor: { code: string } | null;
+    material: { code: string } | null;
+  }>;
+};
+
+export function exportEquipment(rows: EquipmentExportRow[], filename = "equipment.xlsx") {
+  const eqData = rows.map((r) => ({
+    Code: r.code,
+    Name: r.name,
+    Unit: r.unit,
+    "Total Value": r.totalValue,
+    "Depreciation Total": r.depreciationTotal,
+  }));
+
+  const srData: Record<string, unknown>[] = [];
+  for (const eq of rows) {
+    for (const sr of eq.subResources) {
+      const resourceCode = sr.resourceType === "labor" ? sr.labor?.code : sr.material?.code;
+      if (!resourceCode) continue;
+      srData.push({
+        "Equipment Code": eq.code,
+        Type: sr.resourceType,
+        "Resource Code": resourceCode,
+        Quantity: sr.quantity,
+      });
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, makeSheet(eqData, ["Code", "Name", "Unit", "Total Value", "Depreciation Total"]), "Equipment");
+  XLSX.utils.book_append_sheet(wb, makeSheet(srData, ["Equipment Code", "Type", "Resource Code", "Quantity"]), "Sub-Resources");
+  saveWorkbook(wb, filename);
+}
+
+// ── Download: Equipment import template ───────────────────────────────────────
+
+export function downloadEquipmentTemplate() {
+  const eqData = [
+    { Code: "EQ001", Name: "Excavator", Unit: "hr", "Total Value": 500000, "Depreciation Total": 50000 },
+    { Code: "EQ002", Name: "Concrete Mixer", Unit: "hr", "Total Value": 80000, "Depreciation Total": 8000 },
+  ];
+  const srData = [
+    { "Equipment Code": "EQ001", Type: "labor", "Resource Code": "LAB001", Quantity: 1 },
+    { "Equipment Code": "EQ001", Type: "material", "Resource Code": "MAT001", Quantity: 0.5 },
+    { "Equipment Code": "EQ002", Type: "labor", "Resource Code": "LAB001", Quantity: 0.5 },
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, makeSheet(eqData, ["Code", "Name", "Unit", "Total Value", "Depreciation Total"]), "Equipment");
+  XLSX.utils.book_append_sheet(wb, makeSheet(srData, ["Equipment Code", "Type", "Resource Code", "Quantity"]), "Sub-Resources");
+  saveWorkbook(wb, "equipment_template.xlsx");
+}
+
 // ── Export: Full Reports workbook ─────────────────────────────────────────────
 
 type ReportData = {

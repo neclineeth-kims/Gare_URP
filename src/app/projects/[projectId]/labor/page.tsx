@@ -193,9 +193,28 @@ export default function LaborPage() {
               { key: "currencySlot", label: "Currency Slot" },
             ]}
             validate={validateLaborRows}
+            fetchExisting={async () => {
+              const res = await fetch(`/api/v1/projects/${projectId}/labor`);
+              const json = await res.json();
+              return (json.data ?? []).map((l: { code: string; id: string }) => ({ code: l.code, id: l.id }));
+            }}
             onImportRow={async (row) => {
               const res = await fetch(`/api/v1/projects/${projectId}/labor`, {
                 method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  code: row.code,
+                  name: row.name,
+                  unit: row.unit,
+                  rate: row.rate,
+                  currencySlot: row.currencySlot,
+                }),
+              });
+              return res.ok;
+            }}
+            onUpdateRow={async (row, existingId) => {
+              const res = await fetch(`/api/v1/projects/${projectId}/labor/${existingId}`, {
+                method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   code: row.code,

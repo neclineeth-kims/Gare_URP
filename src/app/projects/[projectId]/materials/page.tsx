@@ -191,9 +191,28 @@ export default function MaterialsPage() {
               { key: "currencySlot", label: "Currency Slot" },
             ]}
             validate={validateMaterialRows}
+            fetchExisting={async () => {
+              const res = await fetch(`/api/v1/projects/${projectId}/materials`);
+              const json = await res.json();
+              return (json.data ?? []).map((m: { code: string; id: string }) => ({ code: m.code, id: m.id }));
+            }}
             onImportRow={async (row) => {
               const res = await fetch(`/api/v1/projects/${projectId}/materials`, {
                 method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  code: row.code,
+                  name: row.name,
+                  unit: row.unit,
+                  rate: row.rate,
+                  currencySlot: row.currencySlot,
+                }),
+              });
+              return res.ok;
+            }}
+            onUpdateRow={async (row, existingId) => {
+              const res = await fetch(`/api/v1/projects/${projectId}/materials/${existingId}`, {
+                method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   code: row.code,
