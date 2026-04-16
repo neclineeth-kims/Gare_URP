@@ -27,9 +27,9 @@
     "desktop:build": "npm run desktop:generate && tsx scripts/with-env.ts .env.desktop next build",
     "electron:compile": "tsc --project tsconfig.electron.json",
     "electron:dev": "npm run desktop:setup && npm run electron:compile && tsx scripts/electron-dev.ts",
-    "electron:build:linux": "npm run electron:compile && tsx scripts/with-env.ts .env.desktop ELECTRON_BUILD=1 next build && electron-builder --linux",
-    "electron:build:win": "npm run electron:compile && tsx scripts/with-env.ts .env.desktop ELECTRON_BUILD=1 next build && electron-builder --win",
-    "electron:build": "npm run electron:compile && tsx scripts/with-env.ts .env.desktop ELECTRON_BUILD=1 next build && electron-builder"
+    "electron:build:linux": "npm run desktop:generate && npm run electron:compile && tsx scripts/with-env.ts .env.desktop next build && electron-builder --linux",
+    "electron:build:win": "npm run desktop:generate && npm run electron:compile && tsx scripts/with-env.ts .env.desktop next build && electron-builder --win",
+    "electron:build": "npm run desktop:generate && npm run electron:compile && tsx scripts/with-env.ts .env.desktop next build && electron-builder"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
