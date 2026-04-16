@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrismaForProject } from "@/lib/db";
 import { Decimal } from "@prisma/client/runtime/library";
+import { BoqAnalysisUpdateSchema, parseBody } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
 
@@ -12,22 +13,10 @@ export async function PUT(
     const { projectId, id: boqItemId, resourceId } = await params;
     const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
-    const { coefficient } = body;
 
-    if (coefficient == null) {
-      return NextResponse.json(
-        { error: "coefficient required" },
-        { status: 400 }
-      );
-    }
-
-    const coeff = Number(coefficient);
-    if (coeff <= 0) {
-      return NextResponse.json(
-        { error: "coefficient must be positive" },
-        { status: 400 }
-      );
-    }
+    const parsed = parseBody(BoqAnalysisUpdateSchema, body);
+    if (!parsed.ok) return parsed.response;
+    const { coefficient: coeff } = parsed.data;
 
     const boqItem = await prisma.boqItem.findFirst({
       where: { id: boqItemId, projectId },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrismaForProject } from "@/lib/db";
 import { Decimal } from "@prisma/client/runtime/library";
+import { EquipmentResourceUpdateSchema, parseBody } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
 
@@ -12,14 +13,10 @@ export async function PUT(
     const { projectId, id: equipmentId, resourceId } = await params;
     const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
-    const { quantity } = body;
 
-    if (!quantity || Number(quantity) <= 0) {
-      return NextResponse.json(
-        { error: "quantity must be a positive number" },
-        { status: 400 }
-      );
-    }
+    const parsed = parseBody(EquipmentResourceUpdateSchema, body);
+    if (!parsed.ok) return parsed.response;
+    const { quantity } = parsed.data;
 
     const equipment = await prisma.equipment.findFirst({
       where: { id: equipmentId, projectId },
@@ -37,7 +34,7 @@ export async function PUT(
 
     const updated = await prisma.equipmentResource.update({
       where: { id: resourceId },
-      data: { quantity: new Decimal(Number(quantity)) },
+      data: { quantity: new Decimal(quantity) },
       include: { labor: true, material: true },
     });
 

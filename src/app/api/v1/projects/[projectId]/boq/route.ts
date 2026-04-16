@@ -6,6 +6,7 @@ import {
   type CreateBoqItemInput,
 } from "@/lib/db";
 import { computeAnalysisCosts } from "@/lib/calculations";
+import { BoqCreateSchema, parseBody } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
 
@@ -86,46 +87,22 @@ export async function POST(
     const { projectId } = await params;
     const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
-    const { code, name, unit, quantity, analyses } = body;
 
-    if (!code || !name || !unit || quantity == null) {
-      return NextResponse.json(
-        { error: "Missing required fields: code, name, unit, quantity" },
-        { status: 400 }
-      );
-    }
-
-    const qty = Number(quantity);
-    if (isNaN(qty) || qty <= 0) {
-      return NextResponse.json(
-        { error: "Quantity must be a positive number" },
-        { status: 400 }
-      );
-    }
-
-    if (Array.isArray(analyses) && analyses.length > 0) {
-      for (const a of analyses) {
-        const coeff = Number(a.coefficient);
-        if (isNaN(coeff) || coeff <= 0) {
-          return NextResponse.json(
-            { error: "Coefficient must be a positive number" },
-            { status: 400 }
-          );
-        }
-      }
-    }
+    const parsed = parseBody(BoqCreateSchema, body);
+    if (!parsed.ok) return parsed.response;
+    const { code, name, unit, quantity, analyses } = parsed.data;
 
     const input: CreateBoqItemInput = {
-      code: String(code).trim(),
-      name: String(name).trim(),
-      unit: String(unit).trim(),
-      quantity: qty,
+      code,
+      name,
+      unit,
+      quantity,
     };
 
     if (Array.isArray(analyses) && analyses.length > 0) {
-      input.analyses = analyses.map((a: { analysisId: string; coefficient: number }) => ({
-        analysisId: String(a.analysisId),
-        coefficient: Number(a.coefficient),
+      input.analyses = analyses.map((a) => ({
+        analysisId: a.analysisId,
+        coefficient: a.coefficient,
       }));
     }
 

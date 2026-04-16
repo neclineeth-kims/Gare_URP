@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrismaForProject, getAnalysisById, updateAnalysis, deleteAnalysis } from "@/lib/db";
 import type { UpdateAnalysisInput, AnalysisResourceInput } from "@/lib/db";
-
-type AnalysisResourceRequestBody = {
-  resourceType: string;
-  resourceId: string;
-  quantity: number | string;
-};
+import { AnalysisUpdateSchema, parseBody } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
 
@@ -103,19 +98,22 @@ export async function PUT(
     const { projectId, id } = await params;
     const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
-    const { code, name, unit, base_quantity, resources } = body;
+
+    const parsed = parseBody(AnalysisUpdateSchema, body);
+    if (!parsed.ok) return parsed.response;
+    const { code, name, unit, base_quantity, resources } = parsed.data;
 
     const input: UpdateAnalysisInput = {};
 
-    if (code != null) input.code = String(code).trim();
-    if (name != null) input.name = String(name).trim();
-    if (unit != null) input.unit = String(unit).trim();
-    if (base_quantity != null) input.baseQuantity = Number(base_quantity);
+    if (code != null) input.code = code;
+    if (name != null) input.name = name;
+    if (unit != null) input.unit = unit;
+    if (base_quantity != null) input.baseQuantity = base_quantity;
     if (resources !== undefined) {
-      input.resources = resources.map((res: AnalysisResourceRequestBody): AnalysisResourceInput => ({
-        resourceType: res.resourceType as "labor" | "material" | "equipment",
+      input.resources = resources.map((res): AnalysisResourceInput => ({
+        resourceType: res.resourceType,
         resourceId: res.resourceId,
-        quantity: Number(res.quantity),
+        quantity: res.quantity,
       }));
     }
 
@@ -183,11 +181,12 @@ export async function PUT(
     });
   } catch (e) {
     console.error(e);
-    const status = e instanceof Error && e.message.includes("not found") ? 404 : 500;
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Failed to update analysis" },
-      { status }
-    );
+    const raw = e instanceof Error ? e.message : "Failed to update analysis";
+    const message = raw.includes("Unique constraint")
+      ? "An analysis with this code already exists in the project"
+      : raw;
+    const status = raw.includes("not found") ? 404 : raw.includes("Unique constraint") ? 400 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }
 

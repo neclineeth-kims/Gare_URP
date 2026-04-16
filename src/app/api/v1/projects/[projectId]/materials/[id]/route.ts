@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrismaForProject } from "@/lib/db";
 import { Decimal } from "@prisma/client/runtime/library";
+import { MaterialUpdateSchema, parseBody } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,10 @@ export async function PUT(
     const { projectId, id } = await params;
     const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
-    const { code, name, unit, rate, currencySlot } = body;
+
+    const parsed = parseBody(MaterialUpdateSchema, body);
+    if (!parsed.ok) return parsed.response;
+    const { code, name, unit, rate, currencySlot } = parsed.data;
 
     const existing = await prisma.material.findFirst({ where: { id, projectId } });
     if (!existing) {
@@ -42,29 +46,21 @@ export async function PUT(
     }
 
     const updateData: { code?: string; name?: string; unit?: string; rate?: Decimal; currencySlot?: number } = {};
-    if (code != null) updateData.code = String(code).trim();
-    if (name != null) updateData.name = String(name).trim();
-    if (unit != null) updateData.unit = String(unit).trim();
-    if (rate != null) updateData.rate = new Decimal(Number(rate));
-    if (currencySlot != null) {
-      const slot = Number(currencySlot);
-      if (slot < 1 || slot > 5 || !Number.isInteger(slot)) {
-        return NextResponse.json({ error: "currencySlot must be 1-5" }, { status: 400 });
-      }
-      updateData.currencySlot = slot;
-    }
+    if (code != null) updateData.code = code;
+    if (name != null) updateData.name = name;
+    if (unit != null) updateData.unit = unit;
+    if (rate != null) updateData.rate = new Decimal(rate);
+    if (currencySlot != null) updateData.currencySlot = currencySlot;
 
-    const material = await prisma.material.update({
-      where: { id },
-      data: updateData,
-    });
+    const material = await prisma.material.update({ where: { id }, data: updateData });
     return NextResponse.json({ data: material });
   } catch (e) {
     console.error(e);
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Failed to update material" },
-      { status: 500 }
-    );
+    const raw = e instanceof Error ? e.message : "Failed to update material";
+    const message = raw.includes("Unique constraint")
+      ? "A material with this code already exists in the project"
+      : raw;
+    return NextResponse.json({ error: message }, { status: raw.includes("Unique constraint") ? 400 : 500 });
   }
 }
 

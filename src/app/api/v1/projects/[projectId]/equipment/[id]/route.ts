@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrismaForProject, getEquipmentById, updateEquipment, deleteEquipment } from "@/lib/db";
 import type { UpdateEquipmentInput, SubResourceInput } from "@/lib/db";
-
-type SubResourceRequestBody = {
-  resourceId: string;
-  quantity: number | string;
-  rate?: number | string;
-};
+import { EquipmentUpdateSchema, parseBody } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
 
@@ -61,35 +56,28 @@ export async function PUT(
     const { projectId, id } = await params;
     const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
-    const {
-      code,
-      name,
-      unit,
-      total_value,
-      depreciation_total,
-      laborSubResources,
-      materialSubResources,
-    } = body;
+
+    const parsed = parseBody(EquipmentUpdateSchema, body);
+    if (!parsed.ok) return parsed.response;
+    const { code, name, unit, total_value, depreciation_total, laborSubResources, materialSubResources } = parsed.data;
 
     const input: UpdateEquipmentInput = {};
 
-    if (code != null) input.code = String(code).trim();
-    if (name != null) input.name = String(name).trim();
-    if (unit != null) input.unit = String(unit).trim();
-    if (total_value != null) input.totalValue = Number(total_value);
-    if (depreciation_total != null) input.depreciationTotal = Number(depreciation_total);
+    if (code != null) input.code = code;
+    if (name != null) input.name = name;
+    if (unit != null) input.unit = unit;
+    if (total_value != null) input.totalValue = total_value;
+    if (depreciation_total != null) input.depreciationTotal = depreciation_total;
     if (laborSubResources !== undefined) {
-      input.laborSubResources = laborSubResources.map((sr: SubResourceRequestBody): SubResourceInput => ({
+      input.laborSubResources = laborSubResources.map((sr): SubResourceInput => ({
         resourceId: sr.resourceId,
-        quantity: Number(sr.quantity),
-        rate: sr.rate != null ? Number(sr.rate) : undefined,
+        quantity: sr.quantity,
       }));
     }
     if (materialSubResources !== undefined) {
-      input.materialSubResources = materialSubResources.map((sr: SubResourceRequestBody): SubResourceInput => ({
+      input.materialSubResources = materialSubResources.map((sr): SubResourceInput => ({
         resourceId: sr.resourceId,
-        quantity: Number(sr.quantity),
-        rate: sr.rate != null ? Number(sr.rate) : undefined,
+        quantity: sr.quantity,
       }));
     }
 
@@ -115,11 +103,12 @@ export async function PUT(
     });
   } catch (e) {
     console.error(e);
-    const status = e instanceof Error && e.message.includes("not found") ? 404 : 500;
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Failed to update equipment" },
-      { status }
-    );
+    const raw = e instanceof Error ? e.message : "Failed to update equipment";
+    const message = raw.includes("Unique constraint")
+      ? "An equipment item with this code already exists in the project"
+      : raw;
+    const status = raw.includes("not found") ? 404 : raw.includes("Unique constraint") ? 400 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }
 

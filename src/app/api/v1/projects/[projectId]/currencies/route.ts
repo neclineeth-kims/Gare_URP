@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrismaForProject } from "@/lib/db";
 import { Decimal } from "@prisma/client/runtime/library";
+import { CurrenciesUpdateSchema, CurrencySwapSchema, parseBody } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
 
@@ -54,8 +55,6 @@ export async function GET(
   }
 }
 
-type CurrencyUpdate = { slot: number; code: string; name: string; multiplier: number };
-
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
@@ -65,41 +64,9 @@ export async function PUT(
     const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
 
-    const items = body as CurrencyUpdate[];
-    if (!Array.isArray(items) || items.length !== 5) {
-      return NextResponse.json(
-        { error: "Must provide exactly 5 currency slots" },
-        { status: 400 }
-      );
-    }
-
-    for (const item of items) {
-      if (item.slot < 1 || item.slot > 5) {
-        return NextResponse.json(
-          { error: `Invalid slot ${item.slot}; must be 1-5` },
-          { status: 400 }
-        );
-      }
-      if (!item.code || typeof item.code !== "string" || !item.code.trim()) {
-        return NextResponse.json(
-          { error: `Code required for slot ${item.slot}` },
-          { status: 400 }
-        );
-      }
-      if (!item.name || typeof item.name !== "string" || !item.name.trim()) {
-        return NextResponse.json(
-          { error: `Name required for slot ${item.slot}` },
-          { status: 400 }
-        );
-      }
-      const mult = Number(item.multiplier);
-      if (isNaN(mult) || mult <= 0) {
-        return NextResponse.json(
-          { error: `Multiplier must be > 0 for slot ${item.slot}` },
-          { status: 400 }
-        );
-      }
-    }
+    const parsed = parseBody(CurrenciesUpdateSchema, body);
+    if (!parsed.ok) return parsed.response;
+    const items = parsed.data;
 
     const sorted = [...items].sort((a, b) => a.slot - b.slot);
 
@@ -157,17 +124,10 @@ export async function POST(
   try {
     const { projectId } = await params;
     const body = await req.json();
-    const targetSlot = Number(body?.slot);
 
-    if (!Number.isInteger(targetSlot) || targetSlot < 1 || targetSlot > 5) {
-      return NextResponse.json(
-        { error: "slot must be 1–5" },
-        { status: 400 }
-      );
-    }
-    if (targetSlot === 1) {
-      return NextResponse.json({ error: "Slot 1 is already main" }, { status: 400 });
-    }
+    const parsed = parseBody(CurrencySwapSchema, body);
+    if (!parsed.ok) return parsed.response;
+    const { slot: targetSlot } = parsed.data;
 
     const prisma = await getPrismaForProject(projectId);
     const rows = await getCurrencies(prisma as Parameters<typeof getCurrencies>[0], projectId);

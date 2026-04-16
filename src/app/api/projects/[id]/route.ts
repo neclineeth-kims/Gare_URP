@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deleteProject, updateProjectName, getProjectById } from "@/lib/projects";
+import { ProjectUpdateSchema, parseBody } from "@/lib/validators";
 
 export async function PATCH(
   req: NextRequest,
@@ -8,21 +9,17 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await req.json();
-    const { name } = body;
 
-    if (!name || typeof name !== "string") {
-      return NextResponse.json(
-        { error: "Project name is required" },
-        { status: 400 }
-      );
-    }
+    const parsed = parseBody(ProjectUpdateSchema, body);
+    if (!parsed.ok) return parsed.response;
+    const { name } = parsed.data;
 
     if (!(await getProjectById(id))) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    await updateProjectName(id, name.trim());
-    return NextResponse.json({ data: { id, name: name.trim() } });
+    await updateProjectName(id, name);
+    return NextResponse.json({ data: { id, name } });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Failed to update project" },

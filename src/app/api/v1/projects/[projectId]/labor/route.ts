@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrismaForProject } from "@/lib/db";
 import { Decimal } from "@prisma/client/runtime/library";
+import { LaborCreateSchema, parseBody } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
 
@@ -32,39 +33,28 @@ export async function POST(
     const { projectId } = await params;
     const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
-    const { code, name, unit, rate, currencySlot } = body;
 
-    if (!code || !name || !unit || rate == null) {
-      return NextResponse.json(
-        { error: "Missing required fields: code, name, unit, rate" },
-        { status: 400 }
-      );
-    }
-
-    const slot = currencySlot != null ? Number(currencySlot) : 1;
-    if (slot < 1 || slot > 5 || !Number.isInteger(slot)) {
-      return NextResponse.json(
-        { error: "currencySlot must be 1-5" },
-        { status: 400 }
-      );
-    }
+    const parsed = parseBody(LaborCreateSchema, body);
+    if (!parsed.ok) return parsed.response;
+    const { code, name, unit, rate, currencySlot } = parsed.data;
 
     const labor = await prisma.labor.create({
       data: {
         projectId,
-        code: String(code).trim(),
-        name: String(name).trim(),
-        unit: String(unit).trim(),
-        rate: new Decimal(Number(rate)),
-        currencySlot: slot,
+        code,
+        name,
+        unit,
+        rate: new Decimal(rate),
+        currencySlot: currencySlot ?? 1,
       },
     });
     return NextResponse.json({ data: labor });
   } catch (e) {
     console.error(e);
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Failed to create labor" },
-      { status: 500 }
-    );
+    const raw = e instanceof Error ? e.message : "Failed to create labor";
+    const message = raw.includes("Unique constraint")
+      ? "A labor item with this code already exists in the project"
+      : raw;
+    return NextResponse.json({ error: message }, { status: raw.includes("Unique constraint") ? 400 : 500 });
   }
 }

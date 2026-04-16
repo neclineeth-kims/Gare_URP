@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateProjectName, getProjectByName } from "@/lib/projects";
 import { prisma } from "@/lib/db";
+import { ProjectCreateSchema, parseBody } from "@/lib/validators";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name } = body;
 
-    if (!name || typeof name !== "string") {
-      return NextResponse.json(
-        { error: "Project name is required" },
-        { status: 400 }
-      );
-    }
+    const parsed = parseBody(ProjectCreateSchema, body);
+    if (!parsed.ok) return parsed.response;
+    const { name } = parsed.data;
 
     const validation = validateProjectName(name);
     if (!validation.valid) {
@@ -38,7 +35,7 @@ export async function POST(req: NextRequest) {
 
     const project = await prisma.project.create({
       data: {
-        name: name.trim(),
+        name,
         description: "",
         currencyId: currency.id,
         status: "active",

@@ -7,6 +7,7 @@ import {
   type UpdateBoqItemInput,
 } from "@/lib/db";
 import { computeAnalysisCosts } from "@/lib/calculations";
+import { BoqUpdateSchema, parseBody } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
 
@@ -90,39 +91,22 @@ export async function PUT(
     const { projectId, id } = await params;
     const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
-    const { code, name, unit, quantity, analyses } = body;
+
+    const parsed = parseBody(BoqUpdateSchema, body);
+    if (!parsed.ok) return parsed.response;
+    const { code, name, unit, quantity, analyses } = parsed.data;
 
     const input: UpdateBoqItemInput = {};
 
-    if (code != null) input.code = String(code).trim();
-    if (name != null) input.name = String(name).trim();
-    if (unit != null) input.unit = String(unit).trim();
-    if (quantity != null) {
-      const qty = Number(quantity);
-      if (isNaN(qty) || qty <= 0) {
-        return NextResponse.json(
-          { error: "Quantity must be a positive number" },
-          { status: 400 }
-        );
-      }
-      input.quantity = qty;
-    }
+    if (code != null) input.code = code;
+    if (name != null) input.name = name;
+    if (unit != null) input.unit = unit;
+    if (quantity != null) input.quantity = quantity;
     if (Array.isArray(analyses)) {
-      for (const a of analyses) {
-        const coeff = Number(a.coefficient);
-        if (isNaN(coeff) || coeff <= 0) {
-          return NextResponse.json(
-            { error: "Coefficient must be a positive number" },
-            { status: 400 }
-          );
-        }
-      }
-      input.analyses = analyses.map(
-        (a: { analysisId: string; coefficient: number }) => ({
-          analysisId: String(a.analysisId),
-          coefficient: Number(a.coefficient),
-        })
-      );
+      input.analyses = analyses.map((a) => ({
+        analysisId: a.analysisId,
+        coefficient: a.coefficient,
+      }));
     }
 
     const item = await updateBoqItem(prisma, projectId, id, input);

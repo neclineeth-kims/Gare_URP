@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrismaForProject, getAnalyses, createAnalysis } from "@/lib/db";
 import type { CreateAnalysisInput, AnalysisResourceInput } from "@/lib/db";
-
-type AnalysisResourceRequestBody = {
-  resourceType: string;
-  resourceId: string;
-  quantity: number | string;
-};
+import { AnalysisCreateSchema, parseBody } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
 
@@ -118,24 +113,20 @@ export async function POST(
     const { projectId } = await params;
     const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
-    const { code, name, unit, base_quantity, resources } = body;
 
-    if (!code || !name || !unit || base_quantity == null) {
-      return NextResponse.json(
-        { error: "Missing required fields: code, name, unit, base_quantity" },
-        { status: 400 }
-      );
-    }
+    const parsed = parseBody(AnalysisCreateSchema, body);
+    if (!parsed.ok) return parsed.response;
+    const { code, name, unit, base_quantity, resources } = parsed.data;
 
     const input: CreateAnalysisInput = {
-      code: String(code).trim(),
-      name: String(name).trim(),
-      unit: String(unit).trim(),
-      baseQuantity: Number(base_quantity),
-      resources: resources?.map((res: AnalysisResourceRequestBody): AnalysisResourceInput => ({
-        resourceType: res.resourceType as "labor" | "material" | "equipment",
+      code,
+      name,
+      unit,
+      baseQuantity: base_quantity,
+      resources: resources?.map((res): AnalysisResourceInput => ({
+        resourceType: res.resourceType,
         resourceId: res.resourceId,
-        quantity: Number(res.quantity),
+        quantity: res.quantity,
       })),
     };
 
@@ -183,10 +174,11 @@ export async function POST(
     });
   } catch (e) {
     console.error(e);
-    const status = e instanceof Error && e.message.includes("not found") ? 404 : 500;
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Failed to create analysis" },
-      { status }
-    );
+    const raw = e instanceof Error ? e.message : "Failed to create analysis";
+    const message = raw.includes("Unique constraint")
+      ? "An analysis with this code already exists in the project"
+      : raw;
+    const status = raw.includes("not found") ? 404 : raw.includes("Unique constraint") ? 400 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

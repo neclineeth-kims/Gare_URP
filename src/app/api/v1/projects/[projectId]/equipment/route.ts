@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrismaForProject, getEquipmentList, createEquipment } from "@/lib/db";
 import type { CreateEquipmentInput, SubResourceInput } from "@/lib/db";
-
-type SubResourceRequestBody = {
-  resourceId: string;
-  quantity: number | string;
-  rate?: number | string;
-};
+import { EquipmentCreateSchema, parseBody } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
 
@@ -83,38 +78,24 @@ export async function POST(
     const { projectId } = await params;
     const prisma = await getPrismaForProject(projectId);
     const body = await req.json();
-    const {
+
+    const parsed = parseBody(EquipmentCreateSchema, body);
+    if (!parsed.ok) return parsed.response;
+    const { code, name, unit, total_value, depreciation_total, laborSubResources, materialSubResources } = parsed.data;
+
+    const input: CreateEquipmentInput = {
       code,
       name,
       unit,
-      total_value,
-      depreciation_total,
-      laborSubResources,
-      materialSubResources,
-    } = body;
-
-    if (!code || !name || !unit || total_value == null || depreciation_total == null) {
-      return NextResponse.json(
-        { error: "Missing required fields: code, name, unit, total_value, depreciation_total" },
-        { status: 400 }
-      );
-    }
-
-    const input: CreateEquipmentInput = {
-      code: String(code).trim(),
-      name: String(name).trim(),
-      unit: String(unit).trim(),
-      totalValue: Number(total_value),
-      depreciationTotal: Number(depreciation_total),
-      laborSubResources: laborSubResources?.map((sr: SubResourceRequestBody): SubResourceInput => ({
+      totalValue: total_value,
+      depreciationTotal: depreciation_total,
+      laborSubResources: laborSubResources?.map((sr): SubResourceInput => ({
         resourceId: sr.resourceId,
-        quantity: Number(sr.quantity),
-        rate: sr.rate != null ? Number(sr.rate) : undefined,
+        quantity: sr.quantity,
       })),
-      materialSubResources: materialSubResources?.map((sr: SubResourceRequestBody): SubResourceInput => ({
+      materialSubResources: materialSubResources?.map((sr): SubResourceInput => ({
         resourceId: sr.resourceId,
-        quantity: Number(sr.quantity),
-        rate: sr.rate != null ? Number(sr.rate) : undefined,
+        quantity: sr.quantity,
       })),
     };
 
@@ -140,10 +121,11 @@ export async function POST(
     });
   } catch (e) {
     console.error(e);
-    const status = e instanceof Error && e.message.includes("not found") ? 404 : 500;
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Failed to create equipment" },
-      { status }
-    );
+    const raw = e instanceof Error ? e.message : "Failed to create equipment";
+    const message = raw.includes("Unique constraint")
+      ? "An equipment item with this code already exists in the project"
+      : raw;
+    const status = raw.includes("not found") ? 404 : raw.includes("Unique constraint") ? 400 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }
