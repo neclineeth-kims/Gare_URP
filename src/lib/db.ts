@@ -229,14 +229,20 @@ export async function createEquipment(
     },
   });
 
+  const multipliers = await getCurrencyMultipliers(prisma, projectId);
+  const subResources = applyConversionToSubResources(
+    equipment.subResources as Array<{ labor?: { rate: unknown; currencySlot?: number } | null; material?: { rate: unknown; currencySlot?: number } | null }>,
+    multipliers
+  ) as typeof equipment.subResources;
   const costs = computeEquipmentCosts(
     equipment.totalValue,
     equipment.depreciationTotal,
-    equipment.subResources
+    subResources
   );
 
   return {
     ...equipment,
+    subResources,
     costs,
   };
 }
@@ -337,14 +343,20 @@ export async function updateEquipment(
     },
   });
 
+  const multipliers = await getCurrencyMultipliers(prisma, projectId);
+  const subResources = applyConversionToSubResources(
+    equipment.subResources as Array<{ labor?: { rate: unknown; currencySlot?: number } | null; material?: { rate: unknown; currencySlot?: number } | null }>,
+    multipliers
+  ) as typeof equipment.subResources;
   const costs = computeEquipmentCosts(
     equipment.totalValue,
     equipment.depreciationTotal,
-    equipment.subResources
+    subResources
   );
 
   return {
     ...equipment,
+    subResources,
     costs,
   };
 }
