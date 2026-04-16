@@ -39,7 +39,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Plus, MoreHorizontal, Pencil, Trash2, Download } from "lucide-react";
+import { ImportDialog } from "@/components/ImportDialog";
+import {
+  validateMaterialRows,
+  exportMaterials,
+  downloadMaterialTemplate,
+  type MaterialImportRow,
+} from "@/lib/excel";
 
 type Material = {
   id: string;
@@ -162,7 +169,47 @@ export default function MaterialsPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h2 className="text-2xl font-bold">Materials</h2>
-        <Dialog
+        <div className="flex items-center gap-2">
+          {materials.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportMaterials(materials, "materials.xlsx")}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+          )}
+
+          <ImportDialog<MaterialImportRow>
+            label="Import"
+            columns={[
+              { key: "code", label: "Code" },
+              { key: "name", label: "Name" },
+              { key: "unit", label: "Unit" },
+              { key: "rate", label: "Rate" },
+              { key: "currencySlot", label: "Currency Slot" },
+            ]}
+            validate={validateMaterialRows}
+            onImportRow={async (row) => {
+              const res = await fetch(`/api/v1/projects/${projectId}/materials`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  code: row.code,
+                  name: row.name,
+                  unit: row.unit,
+                  rate: row.rate,
+                  currencySlot: row.currencySlot,
+                }),
+              });
+              return res.ok;
+            }}
+            onDone={fetchMaterials}
+            onDownloadTemplate={downloadMaterialTemplate}
+          />
+
+          <Dialog
           open={dialogOpen}
           onOpenChange={(open) => {
             setDialogOpen(open);
@@ -260,6 +307,7 @@ export default function MaterialsPage() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {loading ? (

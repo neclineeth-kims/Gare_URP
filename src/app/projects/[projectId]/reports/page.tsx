@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -12,6 +13,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Download } from "lucide-react";
+import { exportReport } from "@/lib/excel";
 
 type LaborRow = {
   resource: { code: string; name: string; unit: string; rate: string };
@@ -85,11 +88,20 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-8 print:space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Resource Explosion Report</h2>
-        <p className="text-sm text-muted-foreground">
-          Aggregated resources across all BoQ items. Labor + Material = Direct Cost. Depreciation is separate (Rule #1).
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Resource Explosion Report</h2>
+          <p className="text-sm text-muted-foreground">
+            Aggregated resources across all BoQ items. Labor + Material = Direct Cost. Depreciation is separate (Rule #1).
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => exportReport(data, "Project")}
+        >
+          <Download className="mr-2 h-4 w-4" />
+          Export to Excel
+        </Button>
       </div>
 
       <Card>

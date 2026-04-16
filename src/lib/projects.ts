@@ -12,6 +12,11 @@ import { prisma } from "./db";
 /** True when running against a local SQLite file (offline desktop mode). */
 const isSQLite = process.env.DATABASE_URL?.startsWith("file:");
 
+// Prisma's StringFilter type differs between PostgreSQL (has `mode`) and
+// SQLite (no `mode`). We cast to `unknown` first to satisfy both schemas.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyStringFilter = any;
+
 const DATA_DIR = path.join(process.cwd(), "data");
 export const UNITRATE_MAIN_PATH = path.join(DATA_DIR, "unitrate_main");
 export const UNITRATE_MAIN_DB = path.join(UNITRATE_MAIN_PATH, "unitrate.db");
@@ -54,12 +59,11 @@ export async function getProjectById(projectId: string): Promise<ProjectEntry | 
 /** Get project by name (case-insensitive on PostgreSQL, case-sensitive on SQLite). */
 export async function getProjectByName(name: string): Promise<ProjectEntry | null> {
   const trimmed = name.trim();
+  const nameFilter: AnyStringFilter = isSQLite
+    ? { equals: trimmed }
+    : { equals: trimmed, mode: "insensitive" };
   const project = await prisma.project.findFirst({
-    where: {
-      name: isSQLite
-        ? { equals: trimmed }
-        : { equals: trimmed, mode: "insensitive" },
-    },
+    where: { name: nameFilter },
     select: { id: true, name: true, createdAt: true },
   });
   return project ? projectToEntry(project) : null;
@@ -69,18 +73,12 @@ export async function getProjectByName(name: string): Promise<ProjectEntry | nul
 export async function searchProjects(query: string): Promise<ProjectEntry[]> {
   const lower = query.toLowerCase().trim();
   if (!lower) return getProjects();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const orFilter: any[] = isSQLite
+    ? [{ name: { contains: lower } }, { id: { contains: lower } }]
+    : [{ name: { contains: lower, mode: "insensitive" } }, { id: { contains: lower, mode: "insensitive" } }];
   const projects = await prisma.project.findMany({
-    where: {
-      OR: isSQLite
-        ? [
-            { name: { contains: lower } },
-            { id: { contains: lower } },
-          ]
-        : [
-            { name: { contains: lower, mode: "insensitive" } },
-            { id: { contains: lower, mode: "insensitive" } },
-          ],
-    },
+    where: { OR: orFilter },
     orderBy: { createdAt: "desc" },
     select: { id: true, name: true, createdAt: true },
   });
@@ -107,13 +105,11 @@ export async function updateProjectName(projectId: string, newName: string): Pro
     throw new Error(validation.error);
   }
   const trimmed = newName.trim();
+  const nameFilterUpd: AnyStringFilter = isSQLite
+    ? { equals: trimmed }
+    : { equals: trimmed, mode: "insensitive" };
   const existing = await prisma.project.findFirst({
-    where: {
-      id: { not: projectId },
-      name: isSQLite
-        ? { equals: trimmed }
-        : { equals: trimmed, mode: "insensitive" },
-    },
+    where: { id: { not: projectId }, name: nameFilterUpd },
   });
   if (existing) {
     throw new Error(`A project named "${trimmed}" already exists`);

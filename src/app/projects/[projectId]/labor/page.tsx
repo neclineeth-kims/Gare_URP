@@ -39,7 +39,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Plus, MoreHorizontal, Pencil, Trash2, Download } from "lucide-react";
+import { ImportDialog } from "@/components/ImportDialog";
+import {
+  validateLaborRows,
+  exportLabor,
+  downloadLaborTemplate,
+  type LaborImportRow,
+} from "@/lib/excel";
 
 type Labor = {
   id: string;
@@ -162,7 +169,49 @@ export default function LaborPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h2 className="text-2xl font-bold">Labor</h2>
-        <Dialog
+        <div className="flex items-center gap-2">
+          {/* Export current list */}
+          {labor.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportLabor(labor, "labor.xlsx")}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+          )}
+
+          {/* Import from Excel */}
+          <ImportDialog<LaborImportRow>
+            label="Import"
+            columns={[
+              { key: "code", label: "Code" },
+              { key: "name", label: "Name" },
+              { key: "unit", label: "Unit" },
+              { key: "rate", label: "Rate" },
+              { key: "currencySlot", label: "Currency Slot" },
+            ]}
+            validate={validateLaborRows}
+            onImportRow={async (row) => {
+              const res = await fetch(`/api/v1/projects/${projectId}/labor`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  code: row.code,
+                  name: row.name,
+                  unit: row.unit,
+                  rate: row.rate,
+                  currencySlot: row.currencySlot,
+                }),
+              });
+              return res.ok;
+            }}
+            onDone={fetchLabor}
+            onDownloadTemplate={downloadLaborTemplate}
+          />
+
+          <Dialog
           open={dialogOpen}
           onOpenChange={(open) => {
             setDialogOpen(open);
@@ -260,6 +309,7 @@ export default function LaborPage() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {loading ? (
