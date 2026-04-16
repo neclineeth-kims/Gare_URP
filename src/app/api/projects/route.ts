@@ -23,14 +23,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const currency = await prisma.currency.findFirst({
+    let currency = await prisma.currency.findFirst({
       where: { isBase: true },
     });
+    // Auto-create base currency in desktop/SQLite mode if it doesn't exist yet.
     if (!currency) {
-      return NextResponse.json(
-        { error: "No base currency found. Run db:seed first." },
-        { status: 500 }
-      );
+      const isSQLite = process.env.DATABASE_URL?.startsWith("file:");
+      if (!isSQLite) {
+        return NextResponse.json(
+          { error: "No base currency found. Run db:seed first." },
+          { status: 500 }
+        );
+      }
+      currency = await prisma.currency.create({
+        data: {
+          code: "LOCAL",
+          name: "Local Currency",
+          symbol: "L",
+          exchangeRate: 1,
+          isBase: true,
+        },
+      });
     }
 
     const project = await prisma.project.create({

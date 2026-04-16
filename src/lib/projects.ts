@@ -1,12 +1,16 @@
 /**
  * Project registry and database management.
- * Single Supabase PostgreSQL database. All project data lives in the Project table.
+ * Single Supabase PostgreSQL database (production) or SQLite (desktop/offline).
+ * All project data lives in the Project table.
  */
 
 import { existsSync, mkdirSync, copyFileSync } from "fs";
 import path from "path";
 import { PrismaClient } from "@prisma/client";
 import { prisma } from "./db";
+
+/** True when running against a local SQLite file (offline desktop mode). */
+const isSQLite = process.env.DATABASE_URL?.startsWith("file:");
 
 const DATA_DIR = path.join(process.cwd(), "data");
 export const UNITRATE_MAIN_PATH = path.join(DATA_DIR, "unitrate_main");
@@ -47,27 +51,35 @@ export async function getProjectById(projectId: string): Promise<ProjectEntry | 
   return project ? projectToEntry(project) : null;
 }
 
-/** Get project by name (case-insensitive search) */
+/** Get project by name (case-insensitive on PostgreSQL, case-sensitive on SQLite). */
 export async function getProjectByName(name: string): Promise<ProjectEntry | null> {
+  const trimmed = name.trim();
   const project = await prisma.project.findFirst({
     where: {
-      name: { equals: name.trim(), mode: "insensitive" },
+      name: isSQLite
+        ? { equals: trimmed }
+        : { equals: trimmed, mode: "insensitive" },
     },
     select: { id: true, name: true, createdAt: true },
   });
   return project ? projectToEntry(project) : null;
 }
 
-/** Search projects by name or ID */
+/** Search projects by name or ID. */
 export async function searchProjects(query: string): Promise<ProjectEntry[]> {
   const lower = query.toLowerCase().trim();
   if (!lower) return getProjects();
   const projects = await prisma.project.findMany({
     where: {
-      OR: [
-        { name: { contains: lower, mode: "insensitive" } },
-        { id: { contains: lower, mode: "insensitive" } },
-      ],
+      OR: isSQLite
+        ? [
+            { name: { contains: lower } },
+            { id: { contains: lower } },
+          ]
+        : [
+            { name: { contains: lower, mode: "insensitive" } },
+            { id: { contains: lower, mode: "insensitive" } },
+          ],
     },
     orderBy: { createdAt: "desc" },
     select: { id: true, name: true, createdAt: true },
@@ -98,7 +110,9 @@ export async function updateProjectName(projectId: string, newName: string): Pro
   const existing = await prisma.project.findFirst({
     where: {
       id: { not: projectId },
-      name: { equals: trimmed, mode: "insensitive" },
+      name: isSQLite
+        ? { equals: trimmed }
+        : { equals: trimmed, mode: "insensitive" },
     },
   });
   if (existing) {

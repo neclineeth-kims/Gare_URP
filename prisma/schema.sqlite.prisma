@@ -1,0 +1,199 @@
+// Unit Rate Calculation App - SQLite schema for offline desktop use
+// Use with: prisma generate --schema prisma/schema.sqlite.prisma
+//           prisma db push --schema prisma/schema.sqlite.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Currency {
+  id           String    @id @default(uuid())
+  code         String    @unique
+  name         String
+  symbol       String
+  exchangeRate Decimal   @default(1) @map("exchange_rate")
+  isBase       Boolean   @default(false) @map("is_base")
+  projects     Project[]
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@map("currencies")
+}
+
+model Project {
+  id              String            @id @default(uuid())
+  name            String
+  description     String?
+  currencyId      String            @map("currency_id")
+  currency        Currency          @relation(fields: [currencyId], references: [id])
+  status          String            @default("active")
+  projectCurrencies ProjectCurrency[]
+  labor           Labor[]
+  materials       Material[]
+  equipment       Equipment[]
+  analysis        Analysis[]
+  boqItems        BoqItem[]
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  @@map("projects")
+}
+
+model ProjectCurrency {
+  id         String   @id @default(uuid())
+  projectId  String   @map("project_id")
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slot       Int      // 1-5, slot 1 = main/local currency
+  code       String   // e.g. "SOM", "EUR", "USD"
+  name       String   // e.g. "Somoni", "Euro"
+  multiplier Decimal  @default(1) // exchange rate vs main. Slot 1 always = 1
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([projectId, slot])
+  @@index([projectId])
+  @@map("project_currencies")
+}
+
+model Labor {
+  id                 String              @id @default(uuid())
+  projectId          String              @map("project_id")
+  project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  code               String
+  name               String
+  unit               String
+  rate               Decimal
+  currencySlot       Int                 @default(1) @map("currency_slot") // 1-5, references ProjectCurrency.slot
+  equipmentResources EquipmentResource[]
+  analysisResources  AnalysisResource[]
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+
+  @@unique([projectId, code])
+  @@index([projectId])
+  @@map("labor")
+}
+
+model Material {
+  id                 String              @id @default(uuid())
+  projectId          String              @map("project_id")
+  project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  code               String
+  name               String
+  unit               String
+  rate               Decimal
+  currencySlot       Int                 @default(1) @map("currency_slot") // 1-5, references ProjectCurrency.slot
+  equipmentResources EquipmentResource[]
+  analysisResources  AnalysisResource[]
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+
+  @@unique([projectId, code])
+  @@index([projectId])
+  @@map("materials")
+}
+
+model Equipment {
+  id                String              @id @default(uuid())
+  projectId         String              @map("project_id")
+  project           Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  code              String
+  name              String
+  unit              String
+  totalValue        Decimal             @map("total_value")
+  depreciationTotal Decimal             @map("depreciation_total")
+  subResources      EquipmentResource[]
+  analysisResources AnalysisResource[]
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  @@unique([projectId, code])
+  @@index([projectId])
+  @@map("equipment")
+}
+
+model EquipmentResource {
+  id          String   @id @default(uuid())
+  equipmentId String   @map("equipment_id")
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  resourceType String  @map("resource_type")
+  laborId     String?  @map("labor_id")
+  labor       Labor?   @relation(fields: [laborId], references: [id])
+  materialId  String?  @map("material_id")
+  material    Material? @relation(fields: [materialId], references: [id])
+  quantity    Decimal
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([equipmentId, laborId, materialId])
+  @@map("equipment_resources")
+}
+
+model Analysis {
+  id           String             @id @default(uuid())
+  projectId    String             @map("project_id")
+  project      Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  code         String
+  name         String
+  unit         String
+  baseQuantity Decimal            @map("base_quantity")
+  resources    AnalysisResource[]
+  boqAnalyses  BoqAnalysis[]
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  @@unique([projectId, code])
+  @@index([projectId])
+  @@map("analysis")
+}
+
+model AnalysisResource {
+  id           String    @id @default(uuid())
+  analysisId   String    @map("analysis_id")
+  analysis     Analysis  @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  resourceType String    @map("resource_type")
+  laborId      String?   @map("labor_id")
+  labor        Labor?    @relation(fields: [laborId], references: [id])
+  materialId   String?   @map("material_id")
+  material     Material? @relation(fields: [materialId], references: [id])
+  equipmentId  String?   @map("equipment_id")
+  equipment    Equipment? @relation(fields: [equipmentId], references: [id])
+  quantity     Decimal
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@map("analysis_resources")
+}
+
+model BoqItem {
+  id          String       @id @default(uuid())
+  projectId   String       @map("project_id")
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  code        String
+  name        String
+  unit        String
+  quantity    Decimal
+  boqAnalyses BoqAnalysis[]
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  @@unique([projectId, code])
+  @@index([projectId])
+  @@map("boq_items")
+}
+
+model BoqAnalysis {
+  id          String   @id @default(uuid())
+  boqItemId   String   @map("boq_item_id")
+  boqItem     BoqItem  @relation(fields: [boqItemId], references: [id], onDelete: Cascade)
+  analysisId  String   @map("analysis_id")
+  analysis    Analysis @relation(fields: [analysisId], references: [id])
+  coefficient Decimal
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([boqItemId, analysisId])
+  @@map("boq_analysis")
+}

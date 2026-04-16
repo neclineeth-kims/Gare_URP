@@ -15,7 +15,13 @@
     "db:studio": "prisma studio",
     "init:template": "npx tsx scripts/init-template.ts",
     "db:migrate:deploy": "prisma migrate deploy",
-    "migrate:sqlite-to-supabase": "tsx scripts/migrate-to-supabase.ts"
+    "migrate:sqlite-to-supabase": "tsx scripts/migrate-to-supabase.ts",
+    "desktop:generate": "prisma generate --schema prisma/schema.sqlite.prisma",
+    "desktop:push": "dotenv -e .env.desktop -- prisma db push --schema prisma/schema.sqlite.prisma",
+    "desktop:seed": "dotenv -e .env.desktop -- npx tsx prisma/seed-desktop.ts",
+    "desktop:setup": "npm run desktop:generate && npm run desktop:push && npm run desktop:seed",
+    "desktop:dev": "npm run desktop:generate && dotenv -e .env.desktop -- next dev",
+    "desktop:build": "npm run desktop:generate && dotenv -e .env.desktop -- next build"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
@@ -50,6 +56,7 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "better-sqlite3": "^12.6.2",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
     "postcss": "^8",
