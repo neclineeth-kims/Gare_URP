@@ -8,9 +8,6 @@ directories:
   output: dist-electron        # packaged output goes here
   buildResources: electron/assets
 
-# ── Main entry point (compiled from electron/main.ts) ────────────────────────
-main: electron/dist/main.js
-
 # ── Files to include in the package ─────────────────────────────────────────
 files:
   - "**/*"

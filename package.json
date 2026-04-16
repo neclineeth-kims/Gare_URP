@@ -1,6 +1,8 @@
 {
   "name": "unit-rate-app",
   "version": "0.1.0",
+  "description": "Offline unit rate analysis for construction cost engineering",
+  "author": "Nevzat Kims",
   "private": true,
   "main": "electron/dist/main.js",
   "scripts": {
