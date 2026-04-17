@@ -4,6 +4,11 @@
 appId: com.unitrate.app
 productName: Unit Rate App
 
+# Disable ASAR so all files are regular files on disk.
+# This avoids glob-matching issues with dot-directories like .prisma/client
+# and eliminates all native .node module loading restrictions.
+asar: false
+
 directories:
   output: dist-electron        # packaged output goes here
   buildResources: electron/assets
@@ -29,14 +34,6 @@ files:
   - "!**/*.md"
   - "!dist-electron/**"
   - "!electron/assets/**"
-
-# ── Unpack native modules from ASAR so they can be loaded ────────────────────
-# Prisma's query engine is a pre-compiled native .node binary and must NOT
-# be inside the ASAR archive — it needs to be a real file on disk.
-asarUnpack:
-  - "node_modules/.prisma/**"
-  - "node_modules/@prisma/engines/**"
-  - "node_modules/prisma/**"
 
 # ── Linux build ───────────────────────────────────────────────────────────────
 linux:

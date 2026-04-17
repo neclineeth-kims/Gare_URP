@@ -126,54 +126,17 @@ function getDbPath(): string {
 // ── Prisma engine path (production only) ─────────────────────────────────────
 
 function setPrismaEnginePath(): void {
-  if (isDev) return; // In dev, Prisma finds its engine in node_modules normally
-
-  const unpackedRoot = path.join(eProcess.resourcesPath, "app.asar.unpacked");
-  log("[electron] app.asar.unpacked exists:", fs.existsSync(unpackedRoot));
-
-  // Log top-level contents of unpacked dir
-  if (fs.existsSync(unpackedRoot)) {
-    try {
-      const topLevel = fs.readdirSync(unpackedRoot);
-      log("[electron] app.asar.unpacked contents:", topLevel.join(", "));
-    } catch (e) { logError("[electron] Cannot read unpackedRoot:", e); }
-  }
-
-  // Search all likely locations for the query engine .node file
-  const searchDirs = [
-    path.join(unpackedRoot, "node_modules", ".prisma", "client"),
-    path.join(unpackedRoot, "node_modules", "@prisma", "engines"),
-    path.join(unpackedRoot, "node_modules", "prisma"),
-  ];
-
-  for (const dir of searchDirs) {
-    const exists = fs.existsSync(dir);
-    log(`[electron] ${dir} → exists: ${exists}`);
-    if (exists) {
-      try {
-        const files = fs.readdirSync(dir);
-        log(`[electron]   files: ${files.join(", ")}`);
-        const engineFile = files.find(
-          (f) => (f.startsWith("libquery_engine") || f.startsWith("query_engine")) && f.endsWith(".node")
-        );
-        if (engineFile && !process.env.PRISMA_QUERY_ENGINE_LIBRARY) {
-          process.env.PRISMA_QUERY_ENGINE_LIBRARY = path.join(dir, engineFile);
-          log("[electron] Prisma engine SET:", process.env.PRISMA_QUERY_ENGINE_LIBRARY);
-        }
-      } catch (e) { logError("[electron] Cannot read dir:", dir, e); }
-    }
-  }
-
-  if (!process.env.PRISMA_QUERY_ENGINE_LIBRARY) {
-    logError("[electron] PRISMA_QUERY_ENGINE_LIBRARY could not be set — Prisma may fail");
-  }
+  if (isDev) return;
+  // With asar:false, Prisma can locate its engine normally via node_modules.
+  // No manual path override needed.
+  log("[electron] asar:false — Prisma engine auto-discovery active");
 }
 
 // ── Next.js server (production) ───────────────────────────────────────────────
 
 async function startProdServer(): Promise<void> {
-  // The app directory inside the ASAR
-  const appDir = path.join(eProcess.resourcesPath, "app.asar");
+  // With asar:false the app is a plain folder called "app" (not app.asar)
+  const appDir = path.join(eProcess.resourcesPath, "app");
   log("[electron] resourcesPath:", eProcess.resourcesPath);
   log("[electron] appDir:", appDir);
   log("[electron] DATABASE_URL:", process.env.DATABASE_URL);
