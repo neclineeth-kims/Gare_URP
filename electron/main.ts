@@ -48,6 +48,22 @@ function initLogger() {
     if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
     logFile = path.join(logDir, "urp-debug.log");
     fs.writeFileSync(logFile, `=== URP Log ${new Date().toISOString()} ===\n`);
+
+    // Intercept process.stderr so Next.js internal errors are captured
+    const origStderr = process.stderr.write.bind(process.stderr);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stderr as any).write = (chunk: unknown, ...args: unknown[]) => {
+      try { fs.appendFileSync(logFile!, `[stderr] ${chunk}`); } catch {}
+      return (origStderr as Function)(chunk, ...args);
+    };
+
+    // Also intercept console.error
+    const origConsoleError = console.error.bind(console);
+    console.error = (...args: unknown[]) => {
+      const line = "[console.error] " + args.map(String).join(" ");
+      try { fs.appendFileSync(logFile!, line + "\n"); } catch {}
+      origConsoleError(...args);
+    };
   } catch {}
 }
 
@@ -82,18 +98,27 @@ function getDbPath(): string {
     fs.mkdirSync(userDataPath, { recursive: true });
   }
   const dbPath = path.join(userDataPath, "unitrate.db");
-  // On first launch the database won't exist yet — copy the bundled template
-  // (which has the schema + base currency seed already applied).
-  if (!fs.existsSync(dbPath)) {
-    const templatePath = isDev
-      ? path.join(__dirname, "../../electron/assets/template.db")
-      : path.join(eProcess.resourcesPath, "template.db");
+  // Copy the bundled template db if missing OR if it looks empty/corrupt.
+  // This ensures a clean schema on every fresh install.
+  const templatePath = isDev
+    ? path.join(__dirname, "../../electron/assets/template.db")
+    : path.join(eProcess.resourcesPath, "template.db");
+
+  const dbExists = fs.existsSync(dbPath);
+  const dbSize = dbExists ? fs.statSync(dbPath).size : 0;
+  log("[electron] DB exists:", dbExists, "size:", dbSize, "bytes");
+  log("[electron] template.db path:", templatePath, "exists:", fs.existsSync(templatePath));
+
+  if (!dbExists || dbSize < 8192) {
+    // DB missing or suspiciously small (< 8 KB) — copy fresh template
     if (fs.existsSync(templatePath)) {
       fs.copyFileSync(templatePath, dbPath);
-      log("[electron] First launch: copied template.db →", dbPath);
+      log("[electron] Copied template.db →", dbPath);
     } else {
       logError("[electron] template.db not found at", templatePath);
     }
+  } else {
+    log("[electron] Existing DB kept (size OK)");
   }
   return dbPath.replace(/\\/g, "/");
 }
