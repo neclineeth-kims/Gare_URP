@@ -307,6 +307,123 @@ export function exportEquipment(rows: EquipmentExportRow[], filename = "equipmen
   saveWorkbook(wb, filename);
 }
 
+// ── Parse analysis 2-sheet file ───────────────────────────────────────────────
+
+export type AnalysisSheetRow = {
+  code: string;
+  name: string;
+  unit: string;
+  baseQuantity: number;
+  _error?: string;
+};
+
+export type AnalysisResourceSheetRow = {
+  analysisCode: string;
+  resourceType: "labor" | "material" | "equipment";
+  resourceCode: string;
+  quantity: number;
+  _error?: string;
+};
+
+export type AnalysisImportData = {
+  analyses: AnalysisSheetRow[];
+  resources: AnalysisResourceSheetRow[];
+};
+
+export function parseAnalysisFile(file: File): Promise<AnalysisImportData> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(e.target?.result, { type: "binary" });
+        // Sheet 1: Analyses
+        const sheetName1 = wb.SheetNames[0];
+        const anRaw = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[sheetName1]);
+        const analyses: AnalysisSheetRow[] = anRaw.map((r) => {
+          const errors: string[] = [];
+          const code = str(r.code || r["Code"] || r["analysis_code"]).toUpperCase().slice(0, 20);
+          const name = str(r.name || r["Name"] || r["description"]);
+          const unit = str(r.unit || r["Unit"]);
+          const baseQuantity = num(r.baseQuantity ?? r["base_quantity"] ?? r["Base Quantity"] ?? r["baseqty"] ?? 1);
+          if (!code) errors.push("Code required");
+          if (!name) errors.push("Name required");
+          return { code, name, unit: unit || "unit", baseQuantity, _error: errors.join("; ") || undefined };
+        });
+        // Sheet 2: Resources
+        const sheetName2 = wb.SheetNames[1];
+        const resources: AnalysisResourceSheetRow[] = [];
+        if (sheetName2) {
+          const resRaw = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[sheetName2]);
+          resRaw.forEach((r) => {
+            const errors: string[] = [];
+            const analysisCode = str(r.analysis_code || r["Analysis Code"] || r["analysiscode"] || r["analysisCode"]).toUpperCase();
+            const rawType = str(r.type || r["Type"] || r["resourceType"] || r["resource_type"]).toLowerCase();
+            const resourceType = (["labor", "material", "equipment"].includes(rawType) ? rawType : "") as "labor" | "material" | "equipment";
+            const resourceCode = str(r.resource_code || r["Resource Code"] || r["resourceCode"]).toUpperCase();
+            const quantity = num(r.quantity || r["Quantity"] || 0);
+            if (!analysisCode) errors.push("Analysis Code required");
+            if (!resourceType) errors.push("Type must be labor, material, or equipment");
+            if (!resourceCode) errors.push("Resource Code required");
+            if (quantity <= 0) errors.push("Quantity must be > 0");
+            resources.push({ analysisCode, resourceType, resourceCode, quantity, _error: errors.join("; ") || undefined });
+          });
+        }
+        if (analyses.length === 0) { reject(new Error("No analysis rows found in Sheet 1.")); return; }
+        resolve({ analyses, resources });
+      } catch (err) { reject(err); }
+    };
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsBinaryString(file);
+  });
+}
+
+// ── Export: Analysis list (2-sheet) ───────────────────────────────────────────
+
+type AnalysisExportRow = {
+  code: string;
+  name: string;
+  unit: string;
+  baseQuantity: number;
+  resources: Array<{ resourceType: string; resourceCode: string; quantity: number }>;
+};
+
+export function exportAnalysis(rows: AnalysisExportRow[], filename = "analysis.xlsx") {
+  const wb = XLSX.utils.book_new();
+  const anData = rows.map((a) => ({
+    Code: a.code, Name: a.name, Unit: a.unit, "Base Quantity": a.baseQuantity,
+  }));
+  const resData = rows.flatMap((a) =>
+    a.resources.map((r) => ({
+      "Analysis Code": a.code,
+      Type: r.resourceType,
+      "Resource Code": r.resourceCode,
+      Quantity: r.quantity,
+    }))
+  );
+  XLSX.utils.book_append_sheet(wb, makeSheet(anData, ["Code", "Name", "Unit", "Base Quantity"]), "Analyses");
+  XLSX.utils.book_append_sheet(wb, makeSheet(resData, ["Analysis Code", "Type", "Resource Code", "Quantity"]), "Resources");
+  saveWorkbook(wb, filename);
+}
+
+// ── Download: Analysis import template ────────────────────────────────────────
+
+export function downloadAnalysisTemplate() {
+  const wb = XLSX.utils.book_new();
+  const anData = [
+    { Code: "AN001", Name: "Concrete Foundation", Unit: "m3", "Base Quantity": 1 },
+    { Code: "AN002", Name: "Brickwork", Unit: "m2", "Base Quantity": 1 },
+  ];
+  const resData = [
+    { "Analysis Code": "AN001", Type: "labor", "Resource Code": "LAB001", Quantity: 2.5 },
+    { "Analysis Code": "AN001", Type: "material", "Resource Code": "MAT001", Quantity: 0.3 },
+    { "Analysis Code": "AN001", Type: "equipment", "Resource Code": "EQ001", Quantity: 0.5 },
+    { "Analysis Code": "AN002", Type: "labor", "Resource Code": "LAB001", Quantity: 1.2 },
+  ];
+  XLSX.utils.book_append_sheet(wb, makeSheet(anData, ["Code", "Name", "Unit", "Base Quantity"]), "Analyses");
+  XLSX.utils.book_append_sheet(wb, makeSheet(resData, ["Analysis Code", "Type", "Resource Code", "Quantity"]), "Resources");
+  saveWorkbook(wb, "analysis_template.xlsx");
+}
+
 // ── Download: Equipment import template ───────────────────────────────────────
 
 export function downloadEquipmentTemplate() {

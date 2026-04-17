@@ -4,6 +4,8 @@ import { useState, useMemo, useCallback } from "react";
 import { useAnalysisManager } from "@/hooks/useAnalysisManager";
 import AnalysisTable from "./AnalysisTable";
 import AnalysisDetail from "./AnalysisDetail";
+import { AnalysisImportDialog } from "./AnalysisImportDialog";
+import { exportAnalysis, downloadAnalysisTemplate } from "@/lib/excel";
 import type { AnalysisWithCostsClient } from "@/types/analysis";
 import {
   AlertDialog,
@@ -133,6 +135,22 @@ export default function AnalysisPageClient({
     setSelectedId(null);
   }, []);
 
+  const handleExport = useCallback(() => {
+    exportAnalysis(
+      analyses.map((a) => ({
+        code: a.code,
+        name: a.name,
+        unit: a.unit,
+        baseQuantity: a.baseQuantity,
+        resources: a.resources.map((r) => ({
+          resourceType: r.resourceType,
+          resourceCode: (r.labor?.code ?? r.material?.code ?? r.equipment?.code ?? ""),
+          quantity: r.quantity,
+        })),
+      }))
+    );
+  }, [analyses]);
+
   const showDetail = selectedId !== null || isCreatingNew;
 
   return (
@@ -153,6 +171,14 @@ export default function AnalysisPageClient({
               onSortChange={handleSortChange}
               onAdd={handleAdd}
               onDelete={handleDeleteClick}
+              onExport={handleExport}
+              importSlot={
+                <AnalysisImportDialog
+                  projectId={projectId}
+                  onDone={() => fetchAnalyses(searchTerm || undefined, sortBy)}
+                  onDownloadTemplate={downloadAnalysisTemplate}
+                />
+              }
             />
           </CardContent>
         </Card>

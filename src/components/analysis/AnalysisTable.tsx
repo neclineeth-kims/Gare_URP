@@ -18,9 +18,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, MoreHorizontal, Pencil, Trash2, Search, Loader2 } from "lucide-react";
+import { Plus, MoreHorizontal, Pencil, Trash2, Search, Loader2, Download } from "lucide-react";
 import type { AnalysisWithCostsClient } from "@/types/analysis";
 import { cn } from "@/lib/utils";
+import type { ReactNode } from "react";
 
 type AnalysisTableProps = {
   data: AnalysisWithCostsClient[];
@@ -31,6 +32,8 @@ type AnalysisTableProps = {
   onSortChange: (sort: "code" | "name") => void;
   onAdd: () => void;
   onDelete: (id: string) => void;
+  importSlot?: ReactNode;
+  onExport?: () => void;
 };
 
 export default function AnalysisTable({
@@ -42,6 +45,8 @@ export default function AnalysisTable({
   onSortChange,
   onAdd,
   onDelete,
+  importSlot,
+  onExport,
 }: AnalysisTableProps) {
   const [searchInput, setSearchInput] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -103,6 +108,13 @@ export default function AnalysisTable({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          {importSlot}
+          {onExport && data.length > 0 && (
+            <Button variant="outline" size="sm" onClick={onExport} aria-label="Export analysis">
+              <Download className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+          )}
           <Button onClick={onAdd} aria-label="Add new analysis">
             <Plus className="mr-2 h-4 w-4" />
             Add Analysis
