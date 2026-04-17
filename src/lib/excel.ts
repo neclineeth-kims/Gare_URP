@@ -442,6 +442,63 @@ export function downloadEquipmentTemplate() {
   saveWorkbook(wb, "equipment_template.xlsx");
 }
 
+// ── Export: Single analysis detail ───────────────────────────────────────────
+
+type AnalysisDetailExportInput = {
+  code: string;
+  name: string;
+  unit: string;
+  baseQuantity: number;
+  resources: Array<{
+    type: "labor" | "material" | "equipment";
+    code: string;
+    unit: string;
+    name: string;
+    quantity: number;
+    direct: number;
+    dep: number;
+    total: number;
+  }>;
+  summary: {
+    dir: { labor: number; material: number; equipment: number; total: number; ur: number };
+    dep: { labor: number; material: number; equipment: number; total: number; ur: number };
+    tot: { labor: number; material: number; equipment: number; total: number; ur: number };
+  };
+};
+
+export function exportAnalysisDetail(data: AnalysisDetailExportInput, filename?: string) {
+  const aoa: unknown[][] = [];
+
+  // Title
+  aoa.push(["UNIT RATE ANALYSIS"]);
+  aoa.push([]);
+
+  // Analysis header
+  aoa.push(["Code", "Unit", "Name", "Base Quantity"]);
+  aoa.push([data.code, data.unit, data.name, data.baseQuantity]);
+  aoa.push([]);
+
+  // Resource rows
+  aoa.push(["Type", "Code", "Unit", "Name", "Quantity", "Direct", "Dep", "Total"]);
+  for (const r of data.resources) {
+    const typeLabel = r.type === "labor" ? "L" : r.type === "material" ? "M" : "E";
+    aoa.push([typeLabel, r.code, r.unit, r.name, r.quantity,
+      r.direct || 0, r.dep || 0, r.total || 0]);
+  }
+  aoa.push([]);
+
+  // Summary grid
+  aoa.push(["", "Labor", "Material", "Equipment", "Total", "Unit Rate"]);
+  aoa.push(["DIR",   data.summary.dir.labor, data.summary.dir.material, data.summary.dir.equipment, data.summary.dir.total, data.summary.dir.ur]);
+  aoa.push(["DEP",   data.summary.dep.labor, data.summary.dep.material, data.summary.dep.equipment, data.summary.dep.total, data.summary.dep.ur]);
+  aoa.push(["TOTAL", data.summary.tot.labor, data.summary.tot.material, data.summary.tot.equipment, data.summary.tot.total, data.summary.tot.ur]);
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Analysis");
+  saveWorkbook(wb, filename ?? `${data.code || "analysis"}_unit_rate.xlsx`);
+}
+
 // ── Export: Full Reports workbook ─────────────────────────────────────────────
 
 type ReportData = {
