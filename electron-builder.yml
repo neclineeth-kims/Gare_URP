@@ -13,6 +13,7 @@ asar: true
 
 asarUnpack:
   - "node_modules/@prisma/engines/**"
+  - "node_modules/.prisma/client/*.node"
   - "node_modules/better-sqlite3/**"
 
 directories:
@@ -33,6 +34,9 @@ extraResources:
 # ── Files to include in the package ─────────────────────────────────────────
 files:
   - "**/*"
+  # glob "**/*" does NOT match dot-prefixed directories (.prisma, .next, etc.)
+  # by default. Explicitly include the generated Prisma client directory.
+  - "node_modules/.prisma/**"
   # Exclude secrets and dev-only files
   - "!.env*"
   - "!**/.env*"
