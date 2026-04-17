@@ -25,6 +25,11 @@ extraResources:
   # Pre-seeded SQLite template — copied to userData on first launch
   - from: electron/assets/template.db
     to: template.db
+  # Generated Prisma client — placed outside the ASAR so the require hook in
+  # electron/main.ts can redirect '.prisma/client/*' to these real-FS files.
+  # (electron-builder's glob excludes dot-dirs so .prisma can't go in the ASAR)
+  - from: node_modules/.prisma/client
+    to: prisma-client
 
 # ── Files to include in the package ─────────────────────────────────────────
 files:

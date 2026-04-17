@@ -123,21 +123,31 @@ function getDbPath(): string {
   return dbPath.replace(/\\/g, "/");
 }
 
-// ── Prisma engine path (production only) ─────────────────────────────────────
+// ── Prisma resolution patch (production only) ────────────────────────────────
 //
-// node_modules/.prisma/client/ is explicitly included in the ASAR via the
-// "node_modules/.prisma/**" files entry in electron-builder.yml, so normal
-// ASAR module resolution handles require('.prisma/client/default') correctly.
+// Problem: electron-builder's glob silently excludes dot-prefixed directories,
+// so node_modules/.prisma/client/ is never packed into the ASAR.
 //
-// The only thing we need to do manually is point Prisma at the unpacked
-// native engine binary (electron-builder unpacks *.node files via asarUnpack).
+// Fix: copy .prisma/client to resources/prisma-client via extraResources, then
+// hook Module._resolveFilename to redirect the two require() calls Prisma makes
+// that can't otherwise be satisfied:
+//
+//   1. require('.prisma/client/default')          → resources/prisma-client/default
+//      (bare-package-name lookup, dot-dir → absent from ASAR)
+//
+//   2. require('@prisma/client/runtime/library.js') → app.asar/.../library.js
+//      (called from resources/prisma-client/index.js which is outside the ASAR,
+//       so normal node_modules lookup never reaches inside app.asar)
+//
+// Electron's fs patch makes ASAR paths transparent to Node's file I/O, so
+// _orig() called with an explicit app.asar/... path resolves correctly.
 
 function patchPrismaClientResolution(): void {
   if (isDev) return;
 
-  // Set the Prisma engine path so Prisma can find the unpacked native binary.
-  // electron-builder unpacks node_modules/@prisma/engines/** to app.asar.unpacked.
-  // PRISMA_QUERY_ENGINE_LIBRARY must be the full path to the .node file.
+  // ── 1. Engine binary ───────────────────────────────────────────────────────
+  // PRISMA_QUERY_ENGINE_LIBRARY must be the full path to the .node engine file.
+  // electron-builder unpacks @prisma/engines/** to app.asar.unpacked.
   const enginesDir = path.join(eProcess.resourcesPath, "app.asar.unpacked", "node_modules", "@prisma", "engines");
   if (fs.existsSync(enginesDir)) {
     const engineFile = fs.readdirSync(enginesDir).find(f => f.endsWith(".node"));
@@ -145,22 +155,45 @@ function patchPrismaClientResolution(): void {
       process.env.PRISMA_QUERY_ENGINE_LIBRARY = path.join(enginesDir, engineFile);
       log("[electron] PRISMA_QUERY_ENGINE_LIBRARY →", process.env.PRISMA_QUERY_ENGINE_LIBRARY);
     } else {
-      log("[electron] WARNING: no .node file found in", enginesDir,
-          "— files:", fs.readdirSync(enginesDir).join(", "));
+      log("[electron] WARNING: no .node file found in", enginesDir);
     }
   } else {
-    log("[electron] WARNING: @prisma/engines not found at", enginesDir);
-
-    // Fallback: try the .prisma/client directory (asarUnpack copies .node there too)
-    const clientDir = path.join(eProcess.resourcesPath, "app.asar.unpacked", "node_modules", ".prisma", "client");
-    if (fs.existsSync(clientDir)) {
-      const clientEngine = fs.readdirSync(clientDir).find(f => f.endsWith(".node"));
-      if (clientEngine) {
-        process.env.PRISMA_QUERY_ENGINE_LIBRARY = path.join(clientDir, clientEngine);
-        log("[electron] PRISMA_QUERY_ENGINE_LIBRARY (fallback) →", process.env.PRISMA_QUERY_ENGINE_LIBRARY);
-      }
-    }
+    log("[electron] WARNING: @prisma/engines dir not found at", enginesDir);
   }
+
+  // ── 2. Module resolution hook ──────────────────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const Module = require("module");
+
+  // resources/prisma-client/ = the .prisma/client copy placed by extraResources
+  const prismaClientDir = path.join(eProcess.resourcesPath, "prisma-client");
+  // The @prisma/client package (runtime helpers) lives inside the ASAR.
+  // Electron's fs patch makes ASAR paths readable via ordinary Node.js I/O.
+  const prismaRuntimeDir = path.join(eProcess.resourcesPath, "app.asar", "node_modules", "@prisma", "client", "runtime");
+
+  log("[electron] prisma-client dir:", prismaClientDir, "exists:", fs.existsSync(prismaClientDir));
+  log("[electron] prisma runtime dir:", prismaRuntimeDir);
+
+  const _orig = Module._resolveFilename.bind(Module);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Module._resolveFilename = function (request: string, parent: any, isMain: boolean, options: unknown) {
+    // .prisma/client/* → resources/prisma-client/*
+    if (request === ".prisma/client" || request.startsWith(".prisma/client/")) {
+      const suffix = request.slice(".prisma/client".length); // "" | "/default" | …
+      const target = suffix ? path.join(prismaClientDir, suffix) : prismaClientDir;
+      log("[electron] resolve .prisma redirect:", request, "→", target);
+      return _orig(target, parent, isMain, options);
+    }
+    // @prisma/client/runtime/* → app.asar/…/@prisma/client/runtime/*
+    // Needed because prisma-client/index.js (outside ASAR) requires this.
+    if (request.startsWith("@prisma/client/runtime/")) {
+      const file = request.slice("@prisma/client/runtime/".length);
+      const target = path.join(prismaRuntimeDir, file);
+      log("[electron] resolve runtime redirect:", request, "→", target);
+      return _orig(target, parent, isMain, options);
+    }
+    return _orig(request, parent, isMain, options);
+  };
 }
 
 // ── Next.js server (production) ───────────────────────────────────────────────
