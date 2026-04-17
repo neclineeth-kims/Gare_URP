@@ -1,3 +1,5 @@
+"use client";
+
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -414,4 +416,4 @@ export default function MaterialsPage() {
       </AlertDialog>
     </div>
   );
-}
+}
