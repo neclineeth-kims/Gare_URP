@@ -123,20 +123,59 @@ function getDbPath(): string {
   return dbPath.replace(/\\/g, "/");
 }
 
-// ── Prisma engine path (production only) ─────────────────────────────────────
+// ── Prisma client module resolution patch (production only) ──────────────────
+//
+// Prisma's generated client (in node_modules/.prisma/client/) is copied to
+// resources/prisma-client/ via electron-builder's extraResources.  At runtime
+// inside app.asar, require('.prisma/client/default') can't be resolved because
+// Node.js/Electron's ASAR virtual-FS doesn't reliably handle dot-directories
+// during bare-package-name lookup.  We hook Module._resolveFilename to
+// redirect those requests to the real path on disk.
 
-function setPrismaEnginePath(): void {
+function patchPrismaClientResolution(): void {
   if (isDev) return;
-  // With asar:false, Prisma can locate its engine normally via node_modules.
-  // No manual path override needed.
-  log("[electron] asar:false — Prisma engine auto-discovery active");
+
+  // Set the Prisma engine path so Prisma can find the unpacked native binary.
+  // electron-builder unpacks node_modules/@prisma/engines/** to app.asar.unpacked.
+  // PRISMA_QUERY_ENGINE_LIBRARY must be the full path to the .node file.
+  const enginesDir = path.join(eProcess.resourcesPath, "app.asar.unpacked", "node_modules", "@prisma", "engines");
+  if (fs.existsSync(enginesDir)) {
+    const engineFile = fs.readdirSync(enginesDir).find(f => f.endsWith(".node"));
+    if (engineFile) {
+      process.env.PRISMA_QUERY_ENGINE_LIBRARY = path.join(enginesDir, engineFile);
+      log("[electron] PRISMA_QUERY_ENGINE_LIBRARY →", process.env.PRISMA_QUERY_ENGINE_LIBRARY);
+    } else {
+      log("[electron] WARNING: no .node file found in", enginesDir,
+          "— files:", fs.readdirSync(enginesDir).join(", "));
+    }
+  } else {
+    log("[electron] WARNING: @prisma/engines not found at", enginesDir);
+  }
+
+  // Hook require() to redirect .prisma/client/* → resources/prisma-client/*
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const Module = require("module");
+  const prismaClientDir = path.join(eProcess.resourcesPath, "prisma-client");
+  log("[electron] Patching Module._resolveFilename — prisma-client dir:", prismaClientDir);
+
+  const _orig = Module._resolveFilename.bind(Module);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Module._resolveFilename = function (request: string, parent: any, isMain: boolean, options: unknown) {
+    if (request === ".prisma/client" || request.startsWith(".prisma/client/")) {
+      // e.g. ".prisma/client/default" → "<resourcesPath>/prisma-client/default"
+      const suffix = request.slice(".prisma/client".length); // "" or "/default" etc.
+      const target = suffix ? path.join(prismaClientDir, suffix) : prismaClientDir;
+      log("[electron] resolve redirect:", request, "→", target);
+      return _orig(target, parent, isMain, options);
+    }
+    return _orig(request, parent, isMain, options);
+  };
 }
 
 // ── Next.js server (production) ───────────────────────────────────────────────
 
 async function startProdServer(): Promise<void> {
-  // With asar:false the app is a plain folder called "app" (not app.asar)
-  const appDir = path.join(eProcess.resourcesPath, "app");
+  const appDir = path.join(eProcess.resourcesPath, "app.asar");
   log("[electron] resourcesPath:", eProcess.resourcesPath);
   log("[electron] appDir:", appDir);
   log("[electron] DATABASE_URL:", process.env.DATABASE_URL);
@@ -226,8 +265,8 @@ app.whenReady().then(async () => {
   process.env.DATABASE_URL = `file:${dbPath}`;
   log(`[electron] DATABASE_URL → file:${dbPath}`);
 
-  // 2. Point Prisma to the unpacked engine binary (production only)
-  setPrismaEnginePath();
+  // 2. Patch Prisma module resolution + engine path (production only)
+  patchPrismaClientResolution();
 
   if (isDev) {
     // In dev mode the Next.js dev server is already running (started by
