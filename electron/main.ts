@@ -226,7 +226,6 @@ async function startProdServer(): Promise<void> {
     createServer((req, res) => {
       if (!req.url) return;
       const parsedUrl = parse(req.url, true);
-      log(`[req] ${req.method} ${req.url}`);
       handle(req, res, parsedUrl);
       res.on("finish", () => {
         if (res.statusCode >= 500) {
@@ -265,7 +264,7 @@ function createWindow(url: string): void {
 
   mainWindow.once("ready-to-show", () => {
     mainWindow?.show();
-    mainWindow?.webContents.openDevTools(); // temporary: always open for debugging
+    if (isDev) mainWindow?.webContents.openDevTools();
   });
 
   // Open external links in the system browser, not in the app window
