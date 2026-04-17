@@ -103,32 +103,44 @@ function getDbPath(): string {
 function setPrismaEnginePath(): void {
   if (isDev) return; // In dev, Prisma finds its engine in node_modules normally
 
-  // When packaged, native modules are unpacked from ASAR to app.asar.unpacked
-  const engineDir = path.join(
-    eProcess.resourcesPath,
-    "app.asar.unpacked",
-    "node_modules",
-    ".prisma",
-    "client"
-  );
+  const unpackedRoot = path.join(eProcess.resourcesPath, "app.asar.unpacked");
+  log("[electron] app.asar.unpacked exists:", fs.existsSync(unpackedRoot));
 
-  try {
-    if (!fs.existsSync(engineDir)) return;
-    const files = fs.readdirSync(engineDir);
-    const engineFile = files.find(
-      (f) =>
-        (f.startsWith("libquery_engine") || f.startsWith("query_engine")) &&
-        f.endsWith(".node")
-    );
-    if (engineFile) {
-      process.env.PRISMA_QUERY_ENGINE_LIBRARY = path.join(engineDir, engineFile);
-      log("[electron] Prisma engine:", process.env.PRISMA_QUERY_ENGINE_LIBRARY);
-    } else {
-      logError("[electron] No Prisma engine file found in", engineDir);
-      log("[electron] Files in engineDir:", fs.existsSync(engineDir) ? fs.readdirSync(engineDir).join(", ") : "DIR NOT FOUND");
+  // Log top-level contents of unpacked dir
+  if (fs.existsSync(unpackedRoot)) {
+    try {
+      const topLevel = fs.readdirSync(unpackedRoot);
+      log("[electron] app.asar.unpacked contents:", topLevel.join(", "));
+    } catch (e) { logError("[electron] Cannot read unpackedRoot:", e); }
+  }
+
+  // Search all likely locations for the query engine .node file
+  const searchDirs = [
+    path.join(unpackedRoot, "node_modules", ".prisma", "client"),
+    path.join(unpackedRoot, "node_modules", "@prisma", "engines"),
+    path.join(unpackedRoot, "node_modules", "prisma"),
+  ];
+
+  for (const dir of searchDirs) {
+    const exists = fs.existsSync(dir);
+    log(`[electron] ${dir} → exists: ${exists}`);
+    if (exists) {
+      try {
+        const files = fs.readdirSync(dir);
+        log(`[electron]   files: ${files.join(", ")}`);
+        const engineFile = files.find(
+          (f) => (f.startsWith("libquery_engine") || f.startsWith("query_engine")) && f.endsWith(".node")
+        );
+        if (engineFile && !process.env.PRISMA_QUERY_ENGINE_LIBRARY) {
+          process.env.PRISMA_QUERY_ENGINE_LIBRARY = path.join(dir, engineFile);
+          log("[electron] Prisma engine SET:", process.env.PRISMA_QUERY_ENGINE_LIBRARY);
+        }
+      } catch (e) { logError("[electron] Cannot read dir:", dir, e); }
     }
-  } catch (err) {
-    logError("[electron] Could not locate Prisma engine binary:", err);
+  }
+
+  if (!process.env.PRISMA_QUERY_ENGINE_LIBRARY) {
+    logError("[electron] PRISMA_QUERY_ENGINE_LIBRARY could not be set — Prisma may fail");
   }
 }
 
