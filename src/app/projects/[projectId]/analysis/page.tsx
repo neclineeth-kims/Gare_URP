@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { getPrismaForProject, getAnalyses } from "@/lib/db";
 import AnalysisPageClient from "@/components/analysis/AnalysisPageClient";
 import type { Metadata } from "next";

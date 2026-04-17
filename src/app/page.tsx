@@ -1,3 +1,7 @@
+// Always fetch live data from the runtime database — never serve a
+// statically-generated snapshot baked in at build time.
+export const dynamic = "force-dynamic";
+
 import { getProjects } from "@/lib/projects";
 import { LandingPageClient } from "@/components/landing/LandingPageClient";
 

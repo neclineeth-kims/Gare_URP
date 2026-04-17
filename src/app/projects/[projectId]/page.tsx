@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import Link from "next/link";
 import { getPrismaForProject } from "@/lib/projects";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { getPrismaForProject, getBoqItems } from "@/lib/db";
 import { computeAnalysisCosts } from "@/lib/calculations";
 import BoqPageClient from "@/components/boq/BoqPageClient";

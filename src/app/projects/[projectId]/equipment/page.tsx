@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { getPrismaForProject, getEquipmentList } from "@/lib/db";
 import EquipmentPageClient from "@/components/equipment/EquipmentPageClient";
 import type { Metadata } from "next";

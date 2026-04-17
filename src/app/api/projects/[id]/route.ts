@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
 import { deleteProject, updateProjectName, getProjectById } from "@/lib/projects";
 import { ProjectUpdateSchema, parseBody } from "@/lib/validators";

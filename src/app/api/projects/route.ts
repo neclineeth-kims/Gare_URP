@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
 import { validateProjectName, getProjectByName } from "@/lib/projects";
 import { prisma } from "@/lib/db";
