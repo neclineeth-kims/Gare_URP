@@ -39,6 +39,34 @@ import fs from "node:fs";
 const PORT = 3700;
 const isDev = !app.isPackaged;
 
+// ── File logger (production debugging) ───────────────────────────────────────
+let logFile: string | null = null;
+
+function initLogger() {
+  try {
+    const logDir = app.getPath("userData");
+    if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+    logFile = path.join(logDir, "urp-debug.log");
+    fs.writeFileSync(logFile, `=== URP Log ${new Date().toISOString()} ===\n`);
+  } catch {}
+}
+
+function log(...args: unknown[]) {
+  const line = args.map(String).join(" ");
+  console.log(line);
+  if (logFile) {
+    try { fs.appendFileSync(logFile, line + "\n"); } catch {}
+  }
+}
+
+function logError(...args: unknown[]) {
+  const line = "[ERROR] " + args.map((a) => (a instanceof Error ? a.stack ?? a.message : String(a))).join(" ");
+  console.error(line);
+  if (logFile) {
+    try { fs.appendFileSync(logFile, line + "\n"); } catch {}
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let mainWindow: any = null;
 
@@ -62,9 +90,9 @@ function getDbPath(): string {
       : path.join(eProcess.resourcesPath, "template.db");
     if (fs.existsSync(templatePath)) {
       fs.copyFileSync(templatePath, dbPath);
-      console.log("[electron] First launch: copied template.db →", dbPath);
+      log("[electron] First launch: copied template.db →", dbPath);
     } else {
-      console.warn("[electron] template.db not found at", templatePath);
+      logError("[electron] template.db not found at", templatePath);
     }
   }
   return dbPath.replace(/\\/g, "/");
@@ -94,10 +122,13 @@ function setPrismaEnginePath(): void {
     );
     if (engineFile) {
       process.env.PRISMA_QUERY_ENGINE_LIBRARY = path.join(engineDir, engineFile);
-      console.log("[electron] Prisma engine:", process.env.PRISMA_QUERY_ENGINE_LIBRARY);
+      log("[electron] Prisma engine:", process.env.PRISMA_QUERY_ENGINE_LIBRARY);
+    } else {
+      logError("[electron] No Prisma engine file found in", engineDir);
+      log("[electron] Files in engineDir:", fs.existsSync(engineDir) ? fs.readdirSync(engineDir).join(", ") : "DIR NOT FOUND");
     }
   } catch (err) {
-    console.warn("[electron] Could not locate Prisma engine binary:", err);
+    logError("[electron] Could not locate Prisma engine binary:", err);
   }
 }
 
@@ -106,10 +137,10 @@ function setPrismaEnginePath(): void {
 async function startProdServer(): Promise<void> {
   // The app directory inside the ASAR
   const appDir = path.join(eProcess.resourcesPath, "app.asar");
-  console.log("[electron] resourcesPath:", eProcess.resourcesPath);
-  console.log("[electron] appDir:", appDir);
-  console.log("[electron] DATABASE_URL:", process.env.DATABASE_URL);
-  console.log("[electron] PRISMA_QUERY_ENGINE_LIBRARY:", process.env.PRISMA_QUERY_ENGINE_LIBRARY);
+  log("[electron] resourcesPath:", eProcess.resourcesPath);
+  log("[electron] appDir:", appDir);
+  log("[electron] DATABASE_URL:", process.env.DATABASE_URL);
+  log("[electron] PRISMA_QUERY_ENGINE_LIBRARY:", process.env.PRISMA_QUERY_ENGINE_LIBRARY ?? "NOT SET");
 
   const nextApp = require("next")({
     dev: false,
@@ -119,15 +150,30 @@ async function startProdServer(): Promise<void> {
   });
   const handle = nextApp.getRequestHandler();
 
-  await nextApp.prepare();
+  log("[electron] Calling nextApp.prepare()...");
+  try {
+    await nextApp.prepare();
+    log("[electron] nextApp.prepare() complete");
+  } catch (err) {
+    logError("[electron] nextApp.prepare() FAILED:", err);
+    throw err;
+  }
 
   await new Promise<void>((resolve, reject) => {
     createServer((req, res) => {
       if (!req.url) return;
-      handle(req, res, parse(req.url, true));
+      const parsedUrl = parse(req.url, true);
+      log(`[req] ${req.method} ${req.url}`);
+      handle(req, res, parsedUrl);
+      res.on("finish", () => {
+        if (res.statusCode >= 500) {
+          logError(`[res] ${res.statusCode} ${req.method} ${req.url}`);
+        }
+      });
     })
       .listen(PORT, "127.0.0.1", () => {
-        console.log(`[electron] Next.js server ready on http://127.0.0.1:${PORT}`);
+        log(`[electron] Next.js server ready on http://127.0.0.1:${PORT}`);
+        log(`[electron] Log file: ${logFile}`);
         resolve();
       })
       .on("error", reject);
@@ -173,10 +219,12 @@ function createWindow(url: string): void {
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
+  initLogger();
+
   // 1. Set DATABASE_URL before Prisma ever initialises
   const dbPath = getDbPath();
   process.env.DATABASE_URL = `file:${dbPath}`;
-  console.log(`[electron] DATABASE_URL → file:${dbPath}`);
+  log(`[electron] DATABASE_URL → file:${dbPath}`);
 
   // 2. Point Prisma to the unpacked engine binary (production only)
   setPrismaEnginePath();
@@ -191,7 +239,7 @@ app.whenReady().then(async () => {
       await startProdServer();
       createWindow(`http://127.0.0.1:${PORT}`);
     } catch (err) {
-      console.error("[electron] Failed to start Next.js server:", err);
+      logError("[electron] Failed to start Next.js server:", err);
       app.quit();
     }
   }
