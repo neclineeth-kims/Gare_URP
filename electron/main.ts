@@ -106,6 +106,10 @@ function setPrismaEnginePath(): void {
 async function startProdServer(): Promise<void> {
   // The app directory inside the ASAR
   const appDir = path.join(eProcess.resourcesPath, "app.asar");
+  console.log("[electron] resourcesPath:", eProcess.resourcesPath);
+  console.log("[electron] appDir:", appDir);
+  console.log("[electron] DATABASE_URL:", process.env.DATABASE_URL);
+  console.log("[electron] PRISMA_QUERY_ENGINE_LIBRARY:", process.env.PRISMA_QUERY_ENGINE_LIBRARY);
 
   const nextApp = require("next")({
     dev: false,
@@ -152,7 +156,7 @@ function createWindow(url: string): void {
 
   mainWindow.once("ready-to-show", () => {
     mainWindow?.show();
-    if (isDev) mainWindow?.webContents.openDevTools();
+    mainWindow?.webContents.openDevTools(); // temporary: always open for debugging
   });
 
   // Open external links in the system browser, not in the app window
