@@ -123,14 +123,14 @@ function getDbPath(): string {
   return dbPath.replace(/\\/g, "/");
 }
 
-// ── Prisma client module resolution patch (production only) ──────────────────
+// ── Prisma engine path (production only) ─────────────────────────────────────
 //
-// Prisma's generated client (in node_modules/.prisma/client/) is copied to
-// resources/prisma-client/ via electron-builder's extraResources.  At runtime
-// inside app.asar, require('.prisma/client/default') can't be resolved because
-// Node.js/Electron's ASAR virtual-FS doesn't reliably handle dot-directories
-// during bare-package-name lookup.  We hook Module._resolveFilename to
-// redirect those requests to the real path on disk.
+// node_modules/.prisma/client/ is explicitly included in the ASAR via the
+// "node_modules/.prisma/**" files entry in electron-builder.yml, so normal
+// ASAR module resolution handles require('.prisma/client/default') correctly.
+//
+// The only thing we need to do manually is point Prisma at the unpacked
+// native engine binary (electron-builder unpacks *.node files via asarUnpack).
 
 function patchPrismaClientResolution(): void {
   if (isDev) return;
@@ -150,26 +150,17 @@ function patchPrismaClientResolution(): void {
     }
   } else {
     log("[electron] WARNING: @prisma/engines not found at", enginesDir);
-  }
 
-  // Hook require() to redirect .prisma/client/* → resources/prisma-client/*
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Module = require("module");
-  const prismaClientDir = path.join(eProcess.resourcesPath, "prisma-client");
-  log("[electron] Patching Module._resolveFilename — prisma-client dir:", prismaClientDir);
-
-  const _orig = Module._resolveFilename.bind(Module);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  Module._resolveFilename = function (request: string, parent: any, isMain: boolean, options: unknown) {
-    if (request === ".prisma/client" || request.startsWith(".prisma/client/")) {
-      // e.g. ".prisma/client/default" → "<resourcesPath>/prisma-client/default"
-      const suffix = request.slice(".prisma/client".length); // "" or "/default" etc.
-      const target = suffix ? path.join(prismaClientDir, suffix) : prismaClientDir;
-      log("[electron] resolve redirect:", request, "→", target);
-      return _orig(target, parent, isMain, options);
+    // Fallback: try the .prisma/client directory (asarUnpack copies .node there too)
+    const clientDir = path.join(eProcess.resourcesPath, "app.asar.unpacked", "node_modules", ".prisma", "client");
+    if (fs.existsSync(clientDir)) {
+      const clientEngine = fs.readdirSync(clientDir).find(f => f.endsWith(".node"));
+      if (clientEngine) {
+        process.env.PRISMA_QUERY_ENGINE_LIBRARY = path.join(clientDir, clientEngine);
+        log("[electron] PRISMA_QUERY_ENGINE_LIBRARY (fallback) →", process.env.PRISMA_QUERY_ENGINE_LIBRARY);
+      }
     }
-    return _orig(request, parent, isMain, options);
-  };
+  }
 }
 
 // ── Next.js server (production) ───────────────────────────────────────────────

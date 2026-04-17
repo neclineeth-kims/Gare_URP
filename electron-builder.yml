@@ -25,11 +25,6 @@ extraResources:
   # Pre-seeded SQLite template — copied to userData on first launch
   - from: electron/assets/template.db
     to: template.db
-  # Generated Prisma client — required by Next.js server at runtime.
-  # We copy it outside app.asar because require('.prisma/client/default')
-  # can't be reliably resolved from inside the ASAR virtual filesystem.
-  - from: node_modules/.prisma/client
-    to: prisma-client
 
 # ── Files to include in the package ─────────────────────────────────────────
 files:
